@@ -308,8 +308,8 @@ describe('moodle_list_submissions', () => {
 });
 
 describe('moodle_get_submission', () => {
-  it('текст, файлы без токена, оценка и отзыв', async () => {
-    stubMoodle({
+  it('текст, файлы без токена, оценка, отзыв и комментарии', async () => {
+    const calls = stubMoodle({
       mod_assign_get_submission_status: () => ({
         lastattempt: {
           submission: {
@@ -362,6 +362,17 @@ describe('moodle_get_submission', () => {
         previousattempts: [{ attemptnumber: 0 }],
       }),
       mod_assign_get_participant: () => ({ id: 101, fullname: 'Студент А' }),
+      core_course_get_course_module_by_instance: () => ({ cm: { id: 77, course: 10 } }),
+      // Две страницы по одному комментарию: читаем, пока не наберём count.
+      core_comment_get_comments: (p) => ({
+        comments: [
+          p.page === '0'
+            ? { id: 1, content: '<p>Вопрос</p>', timecreated: 1_700_000_100, userid: 101, fullname: 'Студент А' }
+            : { id: 2, content: '<p>Ответ</p>', timecreated: 1_700_000_200, userid: 2, fullname: 'Тест Преподаватель' },
+        ],
+        count: 2,
+        perpage: 1,
+      }),
     });
 
     const result = await assignmentsTools.moodle_get_submission.execute({
@@ -369,6 +380,20 @@ describe('moodle_get_submission', () => {
       userId: 101,
     });
 
+    const commentCalls = calls.filter((c) => c.wsfunction === 'core_comment_get_comments');
+    expect(commentCalls[0]?.params).toEqual({
+      contextlevel: 'module',
+      instanceid: '77',
+      component: 'assignsubmission_comments',
+      area: 'submission_comments',
+      itemid: '1',
+      page: '0',
+      sortdirection: 'ASC',
+    });
+    expect(result.comments).toEqual([
+      expect.objectContaining({ id: 1, author: 'Студент А', text: 'Вопрос' }),
+      expect.objectContaining({ id: 2, userId: 2, text: 'Ответ' }),
+    ]);
     expect(result).toMatchObject({
       fullname: 'Студент А',
       status: 'submitted',
@@ -403,7 +428,27 @@ describe('moodle_get_submission', () => {
       files: [],
       feedback: null,
       grade: { value: null },
+      comments: [],
     });
+  });
+
+  it('комментарии недоступны — null, сдача читается', async () => {
+    stubMoodle({
+      mod_assign_get_submission_status: () => ({
+        lastattempt: {
+          submission: { id: 3, userid: 101, attemptnumber: 0, timecreated: 1, timemodified: 1, status: 'submitted' },
+        },
+      }),
+      mod_assign_get_participant: () => ({ id: 101, fullname: 'Студент А' }),
+      core_course_get_course_module_by_instance: () => ({ cm: { id: 77, course: 10 } }),
+    });
+
+    const result = await assignmentsTools.moodle_get_submission.execute({
+      assignmentId: 5,
+      userId: 101,
+    });
+
+    expect(result).toMatchObject({ status: 'submitted', comments: null });
   });
 });
 
@@ -529,5 +574,97 @@ describe('moodle_save_grade', () => {
     expect(() => validateGrade(-3, 2)).not.toThrow();
     expect(() => validateGrade(-3, 1.5)).toThrow(/scale/);
     expect(() => validateGrade(0, 1)).toThrow(/has no grade/);
+  });
+});
+
+function submissionStatus(status: string) {
+  return () => ({
+    lastattempt: {
+      submission: { id: 9, userid: 101, attemptnumber: 0, timecreated: 1, timemodified: 1_700_000_000, status },
+    },
+  });
+}
+
+describe('moodle_add_submission_comment', () => {
+  it('пишет комментарий в область сдачи и возвращает его', async () => {
+    const calls = stubMoodle({
+      mod_assign_get_submission_status: submissionStatus('submitted'),
+      core_course_get_course_module_by_instance: () => ({ cm: { id: 77, course: 10 } }),
+      core_comment_add_comments: () => [
+        { id: 5, content: '<p>Поправьте тесты</p>', timecreated: 1_700_000_300, userid: 2, fullname: 'Тест Преподаватель' },
+      ],
+    });
+
+    const result = await gradingTools.moodle_add_submission_comment.execute({
+      assignmentId: 5,
+      userId: 101,
+      text: 'Поправьте тесты',
+    });
+
+    const add = calls.find((c) => c.wsfunction === 'core_comment_add_comments');
+    expect(add?.params).toEqual({
+      'comments[0][contextlevel]': 'module',
+      'comments[0][instanceid]': '77',
+      'comments[0][component]': 'assignsubmission_comments',
+      'comments[0][area]': 'submission_comments',
+      'comments[0][itemid]': '9',
+      'comments[0][content]': 'Поправьте тесты',
+    });
+    expect(result).toMatchObject({ added: true, comment: { id: 5, text: 'Поправьте тесты' } });
+  });
+
+  it('нет сдачи — отказ без записи', async () => {
+    const calls = stubMoodle({
+      mod_assign_get_submission_status: () => ({ lastattempt: {} }),
+    });
+
+    await expect(
+      gradingTools.moodle_add_submission_comment.execute({ assignmentId: 5, userId: 101, text: 'x' }),
+    ).rejects.toThrow(/no submission/);
+    expect(calls.some((c) => c.wsfunction === 'core_comment_add_comments')).toBe(false);
+  });
+});
+
+describe('moodle_revert_submission_to_draft', () => {
+  it('возвращает сданную работу в черновик и читает статус обратно', async () => {
+    let status = 'submitted';
+    const calls = stubMoodle({
+      mod_assign_get_submission_status: () => submissionStatus(status)(),
+      mod_assign_revert_submissions_to_draft: () => {
+        status = 'draft';
+        return [];
+      },
+    });
+
+    const result = await gradingTools.moodle_revert_submission_to_draft.execute({
+      assignmentId: 5,
+      userId: 101,
+    });
+
+    const revert = calls.find((c) => c.wsfunction === 'mod_assign_revert_submissions_to_draft');
+    expect(revert?.params).toEqual({ assignmentid: '5', 'userids[0]': '101' });
+    expect(result).toMatchObject({ reverted: true, status: 'draft' });
+  });
+
+  it('не сдано — отказ без записи', async () => {
+    const calls = stubMoodle({ mod_assign_get_submission_status: submissionStatus('draft') });
+
+    await expect(
+      gradingTools.moodle_revert_submission_to_draft.execute({ assignmentId: 5, userId: 101 }),
+    ).rejects.toThrow(/not submitted/);
+    expect(calls.some((c) => c.wsfunction === 'mod_assign_revert_submissions_to_draft')).toBe(false);
+  });
+
+  it('предупреждение Moodle — ошибка', async () => {
+    stubMoodle({
+      mod_assign_get_submission_status: submissionStatus('submitted'),
+      mod_assign_revert_submissions_to_draft: () => [
+        { item: 'assignment', itemid: 5, warningcode: 'couldnotrevert', message: 'User id: 101' },
+      ],
+    });
+
+    await expect(
+      gradingTools.moodle_revert_submission_to_draft.execute({ assignmentId: 5, userId: 101 }),
+    ).rejects.toThrow(/did not revert/);
   });
 });

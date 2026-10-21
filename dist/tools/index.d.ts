@@ -126,6 +126,13 @@ export declare const allTools: {
             modifiedAt: string | null;
             url: string;
         }[];
+        comments: {
+            id: number;
+            userId: number;
+            author: string;
+            createdAt: string | null;
+            text: string;
+        }[] | null;
     }>;
     readonly moodle_download_file: import("./types.js").ToolDef<import("zod").ZodObject<{
         fileUrl: import("zod").ZodString;
@@ -180,6 +187,46 @@ export declare const allTools: {
         gradedAt: string | null;
         feedback: string | null;
     }>;
+    readonly moodle_add_submission_comment: import("./types.js").ToolDef<import("zod").ZodObject<{
+        assignmentId: import("zod").ZodNumber;
+        userId: import("zod").ZodNumber;
+        text: import("zod").ZodString;
+    }, "strip", import("zod").ZodTypeAny, {
+        assignmentId: number;
+        userId: number;
+        text: string;
+    }, {
+        assignmentId: number;
+        userId: number;
+        text: string;
+    }>, import("zod").ZodTypeAny, {
+        added: boolean;
+        assignmentId: number;
+        userId: number;
+        comment: {
+            id: number;
+            userId: number;
+            author: string;
+            createdAt: string | null;
+            text: string;
+        } | null;
+    }>;
+    readonly moodle_revert_submission_to_draft: import("./types.js").ToolDef<import("zod").ZodObject<{
+        assignmentId: import("zod").ZodNumber;
+        userId: import("zod").ZodNumber;
+    }, "strip", import("zod").ZodTypeAny, {
+        assignmentId: number;
+        userId: number;
+    }, {
+        assignmentId: number;
+        userId: number;
+    }>, import("zod").ZodTypeAny, {
+        reverted: boolean;
+        assignmentId: number;
+        userId: number;
+        status: string | null;
+        modifiedAt: string | null;
+    }>;
     readonly moodle_site_info: import("./types.js").ToolDef<import("zod").ZodObject<{}, "strip", import("zod").ZodTypeAny, {}, {}>, import("zod").ZodTypeAny, {
         site: {
             name: string;
@@ -196,7 +243,7 @@ export declare const allTools: {
             package: string;
             version: string;
         };
-        missingFunctions: ("core_course_get_course_module" | "core_course_get_course_module_by_instance" | "core_enrol_get_users_courses" | "core_webservice_get_site_info" | "mod_assign_get_assignments" | "mod_assign_get_grades" | "mod_assign_get_participant" | "mod_assign_get_submission_status" | "mod_assign_get_submissions" | "mod_assign_list_participants" | "mod_assign_save_grade")[];
+        missingFunctions: ("core_comment_add_comments" | "core_comment_get_comments" | "core_course_get_course_module" | "core_course_get_course_module_by_instance" | "core_enrol_get_users_courses" | "core_webservice_get_site_info" | "mod_assign_get_assignments" | "mod_assign_get_grades" | "mod_assign_get_participant" | "mod_assign_get_submission_status" | "mod_assign_get_submissions" | "mod_assign_list_participants" | "mod_assign_revert_submissions_to_draft" | "mod_assign_save_grade")[];
     }>;
     readonly moodle_list_courses: import("./types.js").ToolDef<import("zod").ZodObject<{}, "strip", import("zod").ZodTypeAny, {}, {}>, import("zod").ZodTypeAny, {
         items: {

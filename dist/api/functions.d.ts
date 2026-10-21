@@ -17,5 +17,8 @@ export declare const WS: {
     readonly submissionStatus: 'mod_assign_get_submission_status';
     readonly grades: 'mod_assign_get_grades';
     readonly saveGrade: 'mod_assign_save_grade';
+    readonly revertToDraft: 'mod_assign_revert_submissions_to_draft';
+    readonly comments: 'core_comment_get_comments';
+    readonly addComments: 'core_comment_add_comments';
 };
 //# sourceMappingURL=functions.d.ts.map

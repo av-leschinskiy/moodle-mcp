@@ -59,7 +59,32 @@ export interface SubmissionStatusResponse {
         attemptnumber: number;
     }[];
 }
+export interface MoodleComment {
+    id: number;
+    content: string;
+    timecreated: number;
+    userid: number;
+    fullname: string;
+}
 export declare function fetchSubmissionStatus(assignmentId: number, userId: number, options?: CallOptions): Promise<SubmissionStatusResponse>;
+/**
+ * Где живут комментарии к сдаче: контекст модуля курса (cmid) и сама сдача
+ * (id записи сдачи, у групповой — сдачи группы).
+ */
+export declare function submissionCommentArea(assignmentId: number, submissionId: number, options?: CallOptions): Promise<{
+    contextlevel: string;
+    instanceid: number;
+    component: string;
+    area: string;
+    itemid: number;
+}>;
+export declare function compactComment(c: MoodleComment): {
+    id: number;
+    userId: number;
+    author: string;
+    createdAt: string | null;
+    text: string;
+};
 export declare const assignmentsTools: {
     moodle_list_assignments: import("./types.js").ToolDef<z.ZodObject<{
         courseId: z.ZodNumber;
@@ -180,6 +205,13 @@ export declare const assignmentsTools: {
             modifiedAt: string | null;
             url: string;
         }[];
+        comments: {
+            id: number;
+            userId: number;
+            author: string;
+            createdAt: string | null;
+            text: string;
+        }[] | null;
     }>;
 };
 export {};

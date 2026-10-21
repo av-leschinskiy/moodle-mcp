@@ -51,10 +51,14 @@ describe('регистрация тулов', () => {
     const destructive = tools
       .filter((t) => t.annotations?.destructiveHint === true)
       .map((t) => t.name);
-    expect(destructive).toEqual(['moodle_save_grade']);
-    expect(tools.find((t) => t.name === 'moodle_save_grade')?.description).toMatch(
-      /THE STUDENT WILL SEE/,
-    );
+    expect(destructive.sort()).toEqual([
+      'moodle_add_submission_comment',
+      'moodle_revert_submission_to_draft',
+      'moodle_save_grade',
+    ]);
+    for (const name of destructive) {
+      expect(tools.find((t) => t.name === name)?.description).toMatch(/THE STUDENT WILL SEE/);
+    }
     expect(tools.find((t) => t.name === 'moodle_list_submissions')?.annotations).toMatchObject({
       readOnlyHint: true,
     });

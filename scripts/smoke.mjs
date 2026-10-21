@@ -63,7 +63,8 @@ try {
     const sub = await run('moodle_get_submission', { assignmentId: assignment.id, userId: first.userId });
     ok(
       'moodle_get_submission',
-      `текст: ${sub.onlineText ? 'есть' : 'нет'}, файлов: ${sub.files.length}, оценка: ${sub.grade.value === null ? 'нет' : 'есть'}`,
+      `текст: ${sub.onlineText ? 'есть' : 'нет'}, файлов: ${sub.files.length}, оценка: ${sub.grade.value === null ? 'нет' : 'есть'}, ` +
+        `комментариев: ${sub.comments === null ? 'недоступны' : sub.comments.length}`,
     );
   }
 } catch (err) {

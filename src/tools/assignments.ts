@@ -125,6 +125,23 @@ interface ParticipantResponse {
   fullname: string;
 }
 
+interface ModuleByInstanceResponse {
+  cm: { id: number };
+}
+
+export interface MoodleComment {
+  id: number;
+  content: string;
+  timecreated: number;
+  userid: number;
+  fullname: string;
+}
+
+interface CommentsResponse {
+  comments: MoodleComment[];
+  count?: number;
+}
+
 // --- Общие помощники -----------------------------------------------------
 
 /** Включённые типы сдачи: `onlinetext`, `file`, … (configs `<plugin>/enabled = 1`). */
@@ -192,6 +209,61 @@ export function fetchSubmissionStatus(
     { assignid: assignmentId, userid: userId },
     options,
   );
+}
+
+/**
+ * Где живут комментарии к сдаче: контекст модуля курса (cmid) и сама сдача
+ * (id записи сдачи, у групповой — сдачи группы).
+ */
+export async function submissionCommentArea(
+  assignmentId: number,
+  submissionId: number,
+  options?: CallOptions,
+) {
+  const { cm } = await getMoodleClient().call<ModuleByInstanceResponse>(
+    WS.moduleByInstance,
+    { module: 'assign', instance: assignmentId },
+    options,
+  );
+  return {
+    contextlevel: 'module',
+    instanceid: cm.id,
+    component: 'assignsubmission_comments',
+    area: 'submission_comments',
+    itemid: submissionId,
+  };
+}
+
+export function compactComment(c: MoodleComment) {
+  return {
+    id: c.id,
+    userId: c.userid,
+    author: c.fullname,
+    createdAt: isoTime(c.timecreated),
+    text: htmlToText(c.content),
+  };
+}
+
+/** Предохранитель от бесконечного листания, если Moodle не отдал count. */
+const MAX_COMMENT_PAGES = 20;
+
+async function fetchSubmissionComments(
+  assignmentId: number,
+  submissionId: number,
+  options?: CallOptions,
+) {
+  const area = await submissionCommentArea(assignmentId, submissionId, options);
+  const comments: MoodleComment[] = [];
+  for (let page = 0; page < MAX_COMMENT_PAGES; page++) {
+    const resp = await getMoodleClient().call<CommentsResponse>(
+      WS.comments,
+      { ...area, page, sortdirection: 'ASC' },
+      options,
+    );
+    comments.push(...resp.comments);
+    if (resp.comments.length === 0 || comments.length >= (resp.count ?? comments.length)) break;
+  }
+  return comments.map(compactComment);
 }
 
 // --- Тулы ----------------------------------------------------------------
@@ -368,7 +440,8 @@ export const assignmentsTools = {
     description:
       'Full submission of one participant: status and attempt number, time, online text ' +
       '(as plain text), attached files (name, size, url for moodle_download_file), ' +
-      'current grade and teacher feedback.',
+      'current grade, teacher feedback and submission comments (the conversation between the ' +
+      'student and teachers; null if comments are unavailable for the assignment).',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: z.object({ assignmentId: assignmentIdSchema, userId: userIdSchema }),
     async execute(args, signal) {
@@ -387,6 +460,22 @@ export const assignmentsTools = {
       const sub = last?.submission ?? last?.teamsubmission;
       const feedback = status.feedback;
       const gradeValue = parseGrade(feedback?.grade?.grade);
+
+      // Комментарии к сдаче — отдельный плагин, его может не быть на сайте или
+      // в задании. Тогда поле null, а сдача всё равно читается.
+      let comments: ReturnType<typeof compactComment>[] | null = [];
+      if (sub) {
+        try {
+          comments = await fetchSubmissionComments(args.assignmentId, sub.id, opts);
+        } catch (err) {
+          log(
+            'warning',
+            `submission comments for user ${args.userId} not received:`,
+            err instanceof Error ? err.message : err,
+          );
+          comments = null;
+        }
+      }
 
       return {
         assignmentId: args.assignmentId,
@@ -412,6 +501,7 @@ export const assignmentsTools = {
         },
         feedback: editorText(feedback?.plugins, 'comments'),
         feedbackFiles: compactFiles(feedback?.plugins),
+        comments,
       };
     },
   }),

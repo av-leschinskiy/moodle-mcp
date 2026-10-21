@@ -18,8 +18,9 @@ const SERVER_INSTRUCTIONS = [
     'moodle_list_submissions(assignmentId, status=needs_grading) → moodle_get_submission →',
     'moodle_download_file for files. assignmentId is the assignment id field, not the cmid from the URL.',
     '',
-    'moodle_save_grade writes a grade and feedback that the student will see: call it only',
-    'after the teacher has explicitly confirmed the grade and the feedback text.',
+    'moodle_save_grade, moodle_add_submission_comment and moodle_revert_submission_to_draft',
+    'change what the student sees: call them only after the teacher has explicitly confirmed',
+    'the action and its text.',
 ].join('\n');
 /**
  * Потолок на текстовый блок ответа. Спека просит дублировать

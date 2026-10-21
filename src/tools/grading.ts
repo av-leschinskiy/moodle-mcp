@@ -1,6 +1,7 @@
 /**
- * Оценивание: запись оценки и отзыва. Единственная запись, которую видит
- * студент, — поэтому `destructiveHint` и подтверждение хоста.
+ * Действия проверяющего, которые видит студент: оценка и отзыв, комментарий
+ * к сдаче, возврат сдачи на доработку. Поэтому у каждого тула
+ * `destructiveHint` и подтверждение хоста.
  */
 
 import { z } from 'zod';
@@ -14,7 +15,13 @@ import {
   isoTime,
 } from '../utils/format.js';
 import { assignmentIdSchema, userIdSchema } from '../utils/schemas.js';
-import { fetchSubmissionStatus } from './assignments.js';
+import {
+  compactComment,
+  fetchSubmissionStatus,
+  submissionCommentArea,
+  type MoodleComment,
+  type SubmissionStatusResponse,
+} from './assignments.js';
 import { defineTool, reqOpts } from './types.js';
 
 /** Форматы текста Moodle (FORMAT_HTML, FORMAT_MARKDOWN). */
@@ -49,6 +56,20 @@ export function validateGrade(gradeSetting: number, grade: number): void {
       `The assignment is graded on a scale (id ${type.scaleId}): the grade is the scale item number, an integer from 1.`,
     );
   }
+}
+
+/** Сдача участника или его группы; нет сдачи — отказ с понятным текстом. */
+function requireSubmission(status: SubmissionStatusResponse, userId: number) {
+  const sub = status.lastattempt?.submission ?? status.lastattempt?.teamsubmission;
+  if (!sub || sub.status === 'new') {
+    throw new Error(`Participant ${userId} has no submission for this assignment.`);
+  }
+  return sub;
+}
+
+interface MoodleWarning {
+  warningcode?: string;
+  message?: string;
 }
 
 export const gradingTools = {
@@ -170,6 +191,86 @@ export const gradingTools = {
           : null,
         gradedAt: isoTime(after.feedback?.gradeddate ?? after.feedback?.grade?.timemodified),
         feedback: field ? htmlToText(field.text) || null : null,
+      };
+    },
+  }),
+
+  moodle_add_submission_comment: defineTool({
+    description:
+      "Adds a comment to a participant's submission (the comments thread under the submission, " +
+      'separate from feedback). THE STUDENT WILL SEE the comment and may receive a notification. ' +
+      'Call only after the teacher has explicitly confirmed the text. Existing comments are in ' +
+      'moodle_get_submission.',
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+    inputSchema: z.object({
+      assignmentId: assignmentIdSchema,
+      userId: userIdSchema,
+      text: z.string().trim().min(1).describe('Comment text, plain text'),
+    }),
+    async execute(args, signal) {
+      const opts = reqOpts(signal);
+      const sub = requireSubmission(
+        await fetchSubmissionStatus(args.assignmentId, args.userId, opts),
+        args.userId,
+      );
+      const area = await submissionCommentArea(args.assignmentId, sub.id, opts);
+      const [added] = await getMoodleClient().call<MoodleComment[]>(
+        WS.addComments,
+        { comments: [{ ...area, content: args.text }] },
+        { ...opts, mutation: true },
+      );
+      return {
+        added: true,
+        assignmentId: args.assignmentId,
+        userId: args.userId,
+        comment: added ? compactComment(added) : null,
+      };
+    },
+  }),
+
+  moodle_revert_submission_to_draft: defineTool({
+    description:
+      "Returns a participant's submitted work for rework: the submission goes back to draft, " +
+      'the student can edit it and submit again while the assignment accepts submissions (due ' +
+      'and cut-off dates or an extension). THE STUDENT WILL SEE the status change. The grade and ' +
+      'feedback stay; for a group submission the whole group is affected. Use it when the ' +
+      'assignment allows one attempt; explain the reason to the student with feedback or ' +
+      'moodle_add_submission_comment. Call only after the teacher has explicitly confirmed.',
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+    inputSchema: z.object({ assignmentId: assignmentIdSchema, userId: userIdSchema }),
+    async execute(args, signal) {
+      const opts = reqOpts(signal);
+      const sub = requireSubmission(
+        await fetchSubmissionStatus(args.assignmentId, args.userId, opts),
+        args.userId,
+      );
+      // Moodle переводит в черновик любую сдачу, даже уже черновик, и при этом
+      // пишет в журнал оценок; отказываем до записи.
+      if (sub.status !== 'submitted') {
+        throw new Error(
+          `Submission of participant ${args.userId} is "${sub.status}", not submitted: nothing to revert.`,
+        );
+      }
+
+      // Неудача приходит не исключением, а списком предупреждений.
+      const warnings = await getMoodleClient().call<MoodleWarning[]>(
+        WS.revertToDraft,
+        { assignmentid: args.assignmentId, userids: [args.userId] },
+        { ...opts, mutation: true },
+      );
+      if (warnings.length > 0) {
+        const detail = warnings.map((w) => w.message ?? w.warningcode).join('; ');
+        throw new Error(`Moodle did not revert the submission: ${detail}`);
+      }
+
+      const after = await fetchSubmissionStatus(args.assignmentId, args.userId, opts);
+      const afterSub = after.lastattempt?.submission ?? after.lastattempt?.teamsubmission;
+      return {
+        reverted: true,
+        assignmentId: args.assignmentId,
+        userId: args.userId,
+        status: afterSub?.status ?? null,
+        modifiedAt: isoTime(afterSub?.timemodified),
       };
     },
   }),

@@ -29,7 +29,7 @@ const CATEGORIES = [
   ['siteTools', 'Site', 'who I am, Moodle version, available functions, my courses'],
   ['assignmentsTools', 'Assignments and submissions', 'course assignments, participants and submission statuses, full submission'],
   ['filesTools', 'Files', 'downloading submission files to disk'],
-  ['gradingTools', 'Grading', 'grade and feedback for a student'],
+  ['gradingTools', 'Grading', 'grade and feedback, submission comment, returning a submission for rework'],
 ];
 
 // Источник истины — собранный dist (он же коммитится в репо). Импорт без

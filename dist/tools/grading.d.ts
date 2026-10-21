@@ -1,6 +1,7 @@
 /**
- * Оценивание: запись оценки и отзыва. Единственная запись, которую видит
- * студент, — поэтому `destructiveHint` и подтверждение хоста.
+ * Действия проверяющего, которые видит студент: оценка и отзыв, комментарий
+ * к сдаче, возврат сдачи на доработку. Поэтому у каждого тула
+ * `destructiveHint` и подтверждение хоста.
  */
 import { z } from 'zod';
 /**
@@ -47,6 +48,46 @@ export declare const gradingTools: {
         gradeDisplay: string | null;
         gradedAt: string | null;
         feedback: string | null;
+    }>;
+    moodle_add_submission_comment: import("./types.js").ToolDef<z.ZodObject<{
+        assignmentId: z.ZodNumber;
+        userId: z.ZodNumber;
+        text: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        assignmentId: number;
+        userId: number;
+        text: string;
+    }, {
+        assignmentId: number;
+        userId: number;
+        text: string;
+    }>, z.ZodTypeAny, {
+        added: boolean;
+        assignmentId: number;
+        userId: number;
+        comment: {
+            id: number;
+            userId: number;
+            author: string;
+            createdAt: string | null;
+            text: string;
+        } | null;
+    }>;
+    moodle_revert_submission_to_draft: import("./types.js").ToolDef<z.ZodObject<{
+        assignmentId: z.ZodNumber;
+        userId: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        assignmentId: number;
+        userId: number;
+    }, {
+        assignmentId: number;
+        userId: number;
+    }>, z.ZodTypeAny, {
+        reverted: boolean;
+        assignmentId: number;
+        userId: number;
+        status: string | null;
+        modifiedAt: string | null;
     }>;
 };
 //# sourceMappingURL=grading.d.ts.map
