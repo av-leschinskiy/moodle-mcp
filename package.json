@@ -1,0 +1,61 @@
+{
+  "name": "moodle-mcp",
+  "version": "0.1.0",
+  "description": "MCP-сервер над REST API Moodle: курсы, задания, сдачи, оценивание",
+  "main": "dist/index.js",
+  "bin": {
+    "moodle-mcp": "dist/index.js",
+    "moodle-mcp-login": "dist/cli/login.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/tsc.mjs",
+    "prebuild": "node scripts/stamp-version.mjs",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "watch": "node scripts/tsc.mjs --watch",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "docs:tools": "node scripts/tool-docs.mjs",
+    "docs:tools:check": "node scripts/tool-docs.mjs --check",
+    "docs:env": "node scripts/env-docs.mjs",
+    "docs:env:check": "node scripts/env-docs.mjs --check",
+    "docs:check": "npm run docs:tools:check && npm run docs:env:check",
+    "verify:fast": "npm run typecheck && npm run lint",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run docs:check",
+    "smoke": "node scripts/smoke.mjs",
+    "login": "tsx src/cli/login.ts",
+    "typecheck": "node scripts/tsc.mjs -p tsconfig.typecheck.json"
+  },
+  "keywords": [
+    "mcp",
+    "moodle"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
+    "tsx": "^4.7.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^4.1.6"
+  }
+}

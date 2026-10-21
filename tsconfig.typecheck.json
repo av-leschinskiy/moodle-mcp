@@ -1,0 +1,12 @@
+{
+  // Полный typecheck: весь src ВКЛЮЧАЯ тесты и src/testing (основной tsconfig их исключает,
+  // чтобы не тащить в dist). Без этого ошибка в моке всплывёт только в
+  // рантайме vitest. Эмита нет — артефакты собирает основной конфиг.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

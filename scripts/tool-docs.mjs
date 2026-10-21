@@ -1,0 +1,153 @@
+#!/usr/bin/env node
+// Генерирует раздел «Что внутри» в README.md из фактического набора тулов
+// (dist/tools/index.js) и проверяет, что документация не ссылается на
+// несуществующие тулы.
+//
+//   node scripts/tool-docs.mjs           — перезаписать блок в README
+//   node scripts/tool-docs.mjs --check   — только проверить (exit 1 при расхождении)
+//
+// Зачем: числа и имена в README, проставленные руками, расходятся с кодом.
+// Единственный источник истины — `allTools`.
+
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '..');
+
+const BEGIN = '<!-- BEGIN:tools-table (сгенерировано scripts/tool-docs.mjs) -->';
+const END = '<!-- END:tools-table -->';
+
+/**
+ * Категории в порядке вывода. Ключ — имя экспорта из `src/tools/index.ts`.
+ * Числа и состав берутся из кода; здесь живёт только человекочитаемая часть.
+ * Новый модуль тулов без записи здесь роняет генератор — это намеренно.
+ */
+const CATEGORIES = [
+  ['siteTools', 'Сайт', 'кто я, версия Moodle, доступные функции, мои курсы'],
+  ['assignmentsTools', 'Задания и сдачи', 'задания курса, участники и статусы сдач, сдача целиком'],
+  ['filesTools', 'Файлы', 'скачивание файлов сдачи на диск'],
+  ['gradingTools', 'Оценивание', 'оценка и отзыв студенту'],
+];
+
+// Источник истины — собранный dist (он же коммитится в репо). Импорт без
+// побочных эффектов: getConfig ленивый, env для чтения списка тулов не нужен.
+let mod;
+try {
+  mod = await import(pathToFileURL(resolve(repoRoot, 'dist/tools/index.js')).href);
+} catch (err) {
+  console.error(
+    `tool-docs: не удалось прочитать dist/tools/index.js (${err.message}). Сначала: npm run build`,
+  );
+  process.exit(1);
+}
+
+const unknown = Object.keys(mod).filter(
+  (name) => name !== 'allTools' && !CATEGORIES.some(([key]) => key === name),
+);
+if (unknown.length > 0) {
+  console.error(
+    `tool-docs: модули без описания категории: ${unknown.join(', ')}. ` +
+      'Добавьте их в CATEGORIES в scripts/tool-docs.mjs.',
+  );
+  process.exit(1);
+}
+
+// Колонка считает НЕ «пишет ли тул», а «спросит ли хост подтверждение»:
+// destructiveHint ставится только за запись, которую видят студенты.
+// Скачивание файла тоже пишет (на локальный диск), но подтверждения не требует.
+const needsConfirmation = (tool) => tool?.annotations?.destructiveHint === true;
+
+const rows = CATEGORIES.map(([key, title, covers]) => {
+  const tools = mod[key];
+  const names = Object.keys(tools).sort();
+  const confirming = names.filter((n) => needsConfirmation(tools[n]));
+  return {
+    title,
+    covers,
+    names,
+    confirmCount: confirming.length,
+    confirming: new Set(confirming),
+  };
+});
+
+const total = Object.keys(mod.allTools).length;
+const totalConfirm = rows.reduce((acc, r) => acc + r.confirmCount, 0);
+const sum = rows.reduce((acc, r) => acc + r.names.length, 0);
+if (sum !== total) {
+  // Возможно только если модуль экспортирует тул под тем же именем, что другой:
+  // при spread в allTools дубль схлопнется. Лучше узнать об этом здесь.
+  console.error(`tool-docs: сумма по категориям ${sum} ≠ ${total} тулов в allTools — есть дубль имени.`);
+  process.exit(1);
+}
+
+const table = [
+  `Всего **${total} тулов**, из них **${totalConfirm}** требуют подтверждения пользователя.`,
+  '',
+  '| Категория | Тулов | Подтверждение | Что покрывает |',
+  '|---|---:|---:|---|',
+  ...rows.map(
+    (r) => `| **${r.title}** | ${r.names.length} | ${r.confirmCount || '—'} | ${r.covers} |`,
+  ),
+  '',
+  '<details>',
+  '<summary>Полный список имён</summary>',
+  '',
+  ...rows.flatMap((r) => [
+    `**${r.title}**`,
+    '',
+    ...r.names.map((n) => `- \`${n}\`${r.confirming.has(n) ? ' — подтверждение' : ''}`),
+    '',
+  ]),
+  '</details>',
+].join('\n');
+
+const readmePath = resolve(repoRoot, 'README.md');
+const readme = readFileSync(readmePath, 'utf8');
+const beginIdx = readme.indexOf(BEGIN);
+const endIdx = readme.indexOf(END);
+if (beginIdx === -1 || endIdx === -1) {
+  console.error(`tool-docs: в README.md нет маркеров ${BEGIN} / ${END}.`);
+  process.exit(1);
+}
+
+let next =
+  readme.slice(0, beginIdx + BEGIN.length) + '\n\n' + table + '\n\n' + readme.slice(endIdx);
+
+// Проверка ссылок на тулы в документации: имя вида moodle_* должно существовать.
+const knownTools = new Set(Object.keys(mod.allTools));
+const docFiles = ['README.md', 'AGENTS.md'];
+/**
+ * Не тулы: `moodle_my_action` — плейсхолдер в шаблоне AGENTS.md,
+ * `moodle_mobile_app` — имя сервиса веб-API Moodle, `moodle_exception` — род
+ * исключения в ответах Moodle.
+ */
+const NOT_TOOLS = new Set(['moodle_my_action', 'moodle_mobile_app', 'moodle_exception']);
+const brokenRefs = [];
+for (const rel of docFiles) {
+  const text = rel === 'README.md' ? next : readFileSync(resolve(repoRoot, rel), 'utf8');
+  for (const match of text.matchAll(/\bmoodle_[a-z0-9_]+/g)) {
+    const name = match[0];
+    if (NOT_TOOLS.has(name) || knownTools.has(name)) continue;
+    brokenRefs.push(`${rel}: ${name}`);
+  }
+}
+if (brokenRefs.length > 0) {
+  console.error('tool-docs: документация ссылается на несуществующие тулы:');
+  for (const ref of [...new Set(brokenRefs)]) console.error(`  ${ref}`);
+  process.exit(1);
+}
+
+const check = process.argv.includes('--check');
+if (next === readme) {
+  if (!check) console.error(`tool-docs: README.md актуален (${total} тулов).`);
+  process.exit(0);
+}
+if (check) {
+  console.error('tool-docs: README.md разошёлся с кодом. Выполните: npm run docs:tools');
+  process.exit(1);
+}
+writeFileSync(readmePath, next);
+console.error(`tool-docs: README.md обновлён (${total} тулов, ${totalConfirm} с подтверждением).`);

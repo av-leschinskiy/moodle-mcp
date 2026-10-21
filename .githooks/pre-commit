@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1. Auto-bump package.json#version при изменениях в src/ — по версии в
+#    moodle_site_info видно, обновился ли пользователь. Ручную правку версии
+#    (package.json уже в стейдже) скрипт уважает.
+node scripts/bump-patch.mjs
+if ! git diff --quiet package.json; then
+  git add package.json
+fi
+
+# 2. Сборка dist/: prebuild перестэмпливает src/version.ts, дальше нативный
+#    tsc 7 (scripts/tsc.mjs). set -e — ошибка сборки отменяет коммит.
+npm run build
+
+# 3. dist/ коммитится (иначе `npx git+ssh://…` не запустится без сборки),
+#    поэтому собранное стейджим вместе с version.ts.
+git add src/version.ts
+git add -A dist/
+
+# 4. typecheck + lint (`verify:fast`) и тесты. Состав проверок живёт в
+#    package.json; тесты идут меньше секунды, поэтому отдельного pre-push нет.
+npm run verify:fast
+npm test
+
+# 5. Таблицы тулов и env в README/AGENTS.md генерируются из dist — пересобираем,
+#    стейджим и проверяем (`docs:check` заодно валит коммит, если документация
+#    ссылается на несуществующий тул).
+node scripts/tool-docs.mjs
+node scripts/env-docs.mjs
+git add README.md AGENTS.md .env.example
+npm run docs:check
