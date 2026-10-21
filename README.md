@@ -41,9 +41,23 @@ Moodle в точности так, как он выглядит в браузе�
    claude mcp add moodle -e MOODLE_URL=https://moodle.example.org -- npx -y @av-leschinskiy/moodle-mcp
    ```
 
-   `-s user` — для всех проектов, без него — только для текущего. Cursor и
-   другие клиенты — stdio-сервер с командой `npx -y @av-leschinskiy/moodle-mcp`
-   и переменной `MOODLE_URL`:
+   `-s user` — для всех проектов, без него — только для текущего.
+
+   Codex — командой или блоком в `~/.codex/config.toml`:
+
+   ```bash
+   codex mcp add moodle --env MOODLE_URL=https://moodle.example.org -- npx -y @av-leschinskiy/moodle-mcp
+   ```
+
+   ```toml
+   [mcp_servers.moodle]
+   command = "npx"
+   args = ["-y", "@av-leschinskiy/moodle-mcp"]
+   env = { MOODLE_URL = "https://moodle.example.org" }
+   ```
+
+   Cursor и другие клиенты — stdio-сервер с командой
+   `npx -y @av-leschinskiy/moodle-mcp` и переменной `MOODLE_URL`:
 
    ```json
    {
