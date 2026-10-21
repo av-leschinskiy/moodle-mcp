@@ -1,7 +1,8 @@
 {
-  "name": "moodle-mcp",
+  "name": "@av-leschinskiy/moodle-mcp",
   "version": "0.1.0",
-  "description": "MCP-сервер над REST API Moodle: курсы, задания, сдачи, оценивание",
+  "description": "MCP-сервер Moodle для преподавателя: задания, сдачи, оценка и отзыв; вход через браузер и SSO",
+  "mcpName": "io.github.av-leschinskiy/moodle-mcp",
   "main": "dist/index.js",
   "bin": {
     "moodle-mcp": "dist/index.js",
@@ -58,5 +59,17 @@
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.59.3",
     "vitest": "^4.1.6"
+  },
+  "author": "Александр Лещинский",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/av-leschinskiy/moodle-mcp.git"
+  },
+  "homepage": "https://github.com/av-leschinskiy/moodle-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/av-leschinskiy/moodle-mcp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -14,7 +14,12 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import { getConfig, normalizeSiteUrl } from '../config.js';
-const LOGIN_HINT = 'Выполните: npx moodle-mcp-login';
+import { PACKAGE_NAME } from '../version.js';
+/**
+ * Подсказка войти заново. Команда — через `-p`: без него npx искал бы пакет
+ * с именем команды, а `moodle-mcp-login` в npm — чужое, никем не занятое имя.
+ */
+export const LOGIN_HINT = `Выполните: npx -y -p ${PACKAGE_NAME} moodle-mcp-login`;
 const tokenFileSchema = z.object({
     /** wwwroot сайта, для которого выпущен токен. */
     site: z.string().url(),

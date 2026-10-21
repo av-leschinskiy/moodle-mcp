@@ -1,0 +1,59 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.av-leschinskiy/moodle-mcp",
+  "description": "MCP-сервер Moodle для преподавателя: задания, сдачи, оценка и отзыв; вход через браузер и SSO",
+  "repository": {
+    "url": "https://github.com/av-leschinskiy/moodle-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@av-leschinskiy/moodle-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MOODLE_URL",
+          "description": "Адрес сайта Moodle (wwwroot), например https://moodle.example.org",
+          "isRequired": true,
+          "format": "string"
+        },
+        {
+          "name": "MOODLE_TOKEN_FILE",
+          "description": "Куда moodle-mcp-login сохраняет токен (путь резолвится через homedir())",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "MOODLE_TOKEN",
+          "description": "Override токена веб-сервиса (CI / смок-тесты)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "MOODLE_TIMEOUT",
+          "description": "Таймаут одного запроса к API (мс)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "MOODLE_CHROME",
+          "description": "Бинарь Chrome/Chromium для moodle-mcp-login (по умолчанию ищется в PATH)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "MOODLE_DEBUG",
+          "description": "1/true/yes/on — отладочный вывод в stderr и уровень debug в канал хоста",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

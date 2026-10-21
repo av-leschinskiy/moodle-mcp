@@ -23,38 +23,44 @@ MCP-сервер для AI-ассистентов (Claude Code, Cursor, Codex и
 Moodle в точности так, как он выглядит в браузере (схема, хост, путь; слэш на
 конце не важен).
 
-```bash
-git clone <адрес этого репозитория> ~/projects/moodle-mcp
-cd ~/projects/moodle-mcp && npm install
+1. Войти — один раз на машине и заново, когда тул ответит ошибкой входа
+   ([Вход в Moodle и токен сервера](docs/features/login.md)):
 
-# 1. Вход: когда входить заново и что гарантирует команда — docs/features/login.md
-MOODLE_URL=https://moodle.example.org node dist/cli/login.js
-#    Откроется окно Chrome: войдите на сайт как обычно (капчу проходите сами).
-#    Команда напишет «Вошёл как <имя> на <сайт>» и закроет окно.
+   ```bash
+   MOODLE_URL=https://moodle.example.org npx -y -p @av-leschinskiy/moodle-mcp moodle-mcp-login
+   ```
 
-# 2. Подключение к Claude Code — в .mcp.json проекта:
-```
+   Откроется окно Chrome: войдите на сайт как обычно, капчу проходите сами.
+   Команда напишет «Вошёл как <имя> на <сайт>» и закроет окно. Без `-p` npx
+   запустил бы сервер, а не вход. Chrome ищется в PATH; на macOS и Windows
+   путь к нему задаёт `MOODLE_CHROME`.
 
-```json
-{
-  "mcpServers": {
-    "moodle": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/абсолютный/путь/к/moodle-mcp/dist/index.js"],
-      "env": { "MOODLE_URL": "https://moodle.example.org" }
-    }
-  }
-}
-```
+2. Подключить сервер к клиенту. Claude Code:
 
-Либо командой: `claude mcp add moodle -e MOODLE_URL=https://moodle.example.org --
-node /абсолютный/путь/к/moodle-mcp/dist/index.js` (`-s user` — для всех
-проектов). Если репозиторий опубликован в git, вместо `node …/dist/index.js`
-подходит `npx -y git+ssh://<адрес репозитория>`: `dist/` закоммичен, сборка у
-пользователя не нужна; вход тогда — `npx -y -p git+ssh://<адрес> moodle-mcp-login` (без `-p` npx запустит сервер, а не вход).
+   ```bash
+   claude mcp add moodle -e MOODLE_URL=https://moodle.example.org -- npx -y @av-leschinskiy/moodle-mcp
+   ```
 
-Проверка: попросите ассистента «покажи мои курсы в Moodle».
+   `-s user` — для всех проектов, без него — только для текущего. Cursor и
+   другие клиенты — stdio-сервер с командой `npx -y @av-leschinskiy/moodle-mcp`
+   и переменной `MOODLE_URL`:
+
+   ```json
+   {
+     "mcpServers": {
+       "moodle": {
+         "command": "npx",
+         "args": ["-y", "@av-leschinskiy/moodle-mcp"],
+         "env": { "MOODLE_URL": "https://moodle.example.org" }
+       }
+     }
+   }
+   ```
+
+3. Проверить: попросите ассистента «покажи мои курсы в Moodle».
+
+Из клона репозитория вместо `npx` — `node <клон>/dist/index.js` и
+`node <клон>/dist/cli/login.js`: `dist/` закоммичен, сборка не нужна.
 
 ## Что внутри
 

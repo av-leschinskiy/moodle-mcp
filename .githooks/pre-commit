@@ -28,5 +28,5 @@ npm test
 #    ссылается на несуществующий тул).
 node scripts/tool-docs.mjs
 node scripts/env-docs.mjs
-git add README.md AGENTS.md .env.example
+git add README.md AGENTS.md .env.example server.json
 npm run docs:check

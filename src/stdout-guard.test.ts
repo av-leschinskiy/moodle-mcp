@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { PACKAGE_NAME } from './version.js';
 
 describe('stdout-guard', () => {
   it('перенаправляет console.log в stderr с пометкой', async () => {
@@ -13,7 +14,7 @@ describe('stdout-guard', () => {
       await import('./stdout-guard.js');
       console.log('случайный вывод', 42);
 
-      expect(written.join('')).toContain('[moodle-mcp][stdout-guard] случайный вывод 42');
+      expect(written.join('')).toContain(`[${PACKAGE_NAME}][stdout-guard] случайный вывод 42`);
     } finally {
       spy.mockRestore();
       // Перехват в проде необратим, но тестовому процессу консоль нужна дальше.

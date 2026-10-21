@@ -15,7 +15,7 @@
  * `mutation: true` не повторяется: оценка не должна записаться дважды.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { getToken } from '../auth/token-store.js';
+import { getToken, LOGIN_HINT } from '../auth/token-store.js';
 import { getConfig } from '../config.js';
 import { log } from '../utils/logger.js';
 export class MoodleRequestError extends Error {
@@ -38,7 +38,6 @@ export class MoodleRequestError extends Error {
  * обычные ошибки функции: перелогин их не лечит, и советовать его нельзя.
  */
 const AUTH_ERROR_CODES = new Set(['invalidtoken', 'accessexception', 'expiredtoken']);
-const LOGIN_HINT = 'Выполните: npx moodle-mcp-login';
 /**
  * Вычищает токены из строки: параметры `token`/`wstoken`/`privatetoken` в URL
  * и формах, а
