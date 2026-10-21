@@ -35,7 +35,25 @@ jobs:
       # src/version.ts. Проверки (verify) сверяют таблицы и server.json с dist.
       - run: npm run verify
 
-      - run: npm publish
+      # Повторный запуск (упал шаг Registry) не должен падать на уже опубликованной версии.
+      - name: Опубликовать в npm
+        run: |
+          if npm view "$(node -p 'require("./package.json").name')@${GITHUB_REF_NAME#v}" version >/dev/null 2>&1; then
+            echo "Версия ${GITHUB_REF_NAME#v} уже в npm — пропускаю"
+          else
+            npm publish
+          fi
+
+      # npm обрабатывает пакет асинхронно, а Registry сверяет запись с версией в npm:
+      # без ожидания он отвечает «version not found».
+      - name: Дождаться версии в npm
+        run: |
+          pkg="$(node -p 'require("./package.json").name')@${GITHUB_REF_NAME#v}"
+          for _ in $(seq 60); do
+            npm view "$pkg" version --prefer-online >/dev/null 2>&1 && exit 0
+            sleep 10
+          done
+          echo "$pkg не появился в npm за 10 минут"; exit 1
 
       - name: Установить mcp-publisher
         run: |
