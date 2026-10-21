@@ -33,7 +33,7 @@ slash does not matter).
    ```
 
    A Chrome window opens: log in to the site as usual and solve the captcha
-   yourself. The command prints "Logged in as <name> on <site>" and closes the
+   yourself. The command prints `Logged in as <name> on <site>` and closes the
    window. Without `-p`, npx would start the server instead of the login command.
    Chrome is looked up in PATH; on macOS and Windows, set its path in
    `MOODLE_CHROME`.
