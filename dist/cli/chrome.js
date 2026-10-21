@@ -45,7 +45,7 @@ export function findChrome(explicit, pathEnv = process.env.PATH ?? '', canExecut
                 return candidate;
         }
     }
-    throw new Error(`Chrome не найден в PATH (искал: ${CHROME_CANDIDATES.join(', ')}). Укажите бинарь в MOODLE_CHROME.`);
+    throw new Error(`Chrome not found in PATH (looked for: ${CHROME_CANDIDATES.join(', ')}). Set the binary path in MOODLE_CHROME.`);
 }
 /**
  * Разбор `DevToolsActivePort`: первая строка — порт, вторая — путь
@@ -56,7 +56,7 @@ export function parseDevToolsActivePort(text) {
     const [portLine, pathLine] = text.split(/\r?\n/);
     const port = Number(portLine);
     if (!Number.isInteger(port) || port <= 0 || !pathLine?.startsWith('/devtools/browser/')) {
-        throw new Error('DevToolsActivePort не разобран.');
+        throw new Error('Cannot parse DevToolsActivePort.');
     }
     return { port, browserPath: pathLine.trim() };
 }
@@ -74,7 +74,7 @@ export async function waitForDevToolsPort(profileDir, chrome, timeoutMs) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
         if (chrome.exitCode !== null) {
-            throw new Error(`Chrome завершился до старта (код ${chrome.exitCode}).`);
+            throw new Error(`Chrome exited before startup (code ${chrome.exitCode}).`);
         }
         try {
             return parseDevToolsActivePort(await readFile(join(profileDir, 'DevToolsActivePort'), 'utf8'));
@@ -83,7 +83,7 @@ export async function waitForDevToolsPort(profileDir, chrome, timeoutMs) {
             await new Promise((r) => setTimeout(r, 200));
         }
     }
-    throw new Error('Chrome не открыл порт отладки вовремя.');
+    throw new Error('Chrome did not open the debugging port in time.');
 }
 /**
  * URL-ы из событий CDP, в которых может оказаться редирект с токеном. Три
@@ -116,7 +116,7 @@ export async function captureLaunchRedirect(opts) {
     const ws = new WebSocket(opts.wsUrl);
     await new Promise((resolve, reject) => {
         ws.addEventListener('open', () => resolve(), { once: true });
-        ws.addEventListener('error', () => reject(new Error('CDP: не удалось подключиться к Chrome.')), {
+        ws.addEventListener('error', () => reject(new Error('CDP: failed to connect to Chrome.')), {
             once: true,
         });
     });
@@ -137,11 +137,11 @@ export async function captureLaunchRedirect(opts) {
         const attached = new Set();
         let navigated = false;
         const timer = setTimeout(() => {
-            reject(new Error('Вход не завершён вовремя.'));
+            reject(new Error('Login did not complete in time.'));
         }, opts.timeoutMs);
         const onExit = () => {
             clearTimeout(timer);
-            reject(new Error('Окно Chrome закрыто до завершения входа.'));
+            reject(new Error('Chrome window was closed before login completed.'));
         };
         opts.chrome.once('exit', onExit);
         const done = (url) => {

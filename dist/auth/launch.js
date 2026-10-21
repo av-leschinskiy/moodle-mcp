@@ -44,7 +44,7 @@ export function isLaunchRedirect(url) {
 export function parseLaunchRedirect(url, site, passport) {
     const prefix = `${URL_SCHEME}://token=`;
     if (!url.startsWith(prefix)) {
-        throw new Error('Редирект Moodle не содержит токена.');
+        throw new Error('Moodle redirect does not contain a token.');
     }
     let payload = url.slice(prefix.length);
     // Браузер мог процентно-закодировать `=` паддинга base64.
@@ -57,11 +57,11 @@ export function parseLaunchRedirect(url, site, passport) {
     const parts = Buffer.from(payload, 'base64').toString('utf8').split(':::');
     const [signature, token, privatetoken] = parts;
     if (!signature || !token) {
-        throw new Error('Ответ Moodle не разобран: ожидалось signature:::token[:::privatetoken].');
+        throw new Error('Cannot parse Moodle response: expected signature:::token[:::privatetoken].');
     }
     if (signature !== launchSignature(site, passport)) {
-        throw new Error(`Подпись ответа Moodle не совпала. Проверьте, что MOODLE_URL (${site}) ` +
-            'в точности равен адресу сайта, включая http/https и путь.');
+        throw new Error(`Moodle response signature mismatch. Check that MOODLE_URL (${site}) ` +
+            'exactly matches the site address, including http/https and path.');
     }
     return privatetoken ? { token, privatetoken } : { token };
 }

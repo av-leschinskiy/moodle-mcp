@@ -56,7 +56,7 @@ export function stubMoodle(handlers: Record<string, Handler>): RecordedCall[] {
         return jsonResponse({
           exception: 'moodle_exception',
           errorcode: 'nohandler',
-          message: `нет заглушки для ${wsfunction}`,
+          message: `no stub for ${wsfunction}`,
         });
       }
       return jsonResponse(handler(params));

@@ -12,10 +12,10 @@ export function fetchSiteInfo(options) {
 }
 export const siteTools = {
     moodle_site_info: defineTool({
-        description: 'Кто я на сайте Moodle и что это за сайт: имя пользователя, его id, название и версия ' +
-            'Moodle, версия этого MCP-сервера. missingFunctions — функции API, которых не ' +
-            'открывает токен (тулы, которым они нужны, упадут). Начинать с него, если ' +
-            'не ясно, работает ли подключение.',
+        description: 'Who I am on the Moodle site and what the site is: user name and id, site name and ' +
+            'Moodle version, version of this MCP server. missingFunctions lists API functions the ' +
+            'token does not grant (tools that need them will fail). Start here if it is unclear ' +
+            'whether the connection works.',
         annotations: { readOnlyHint: true, idempotentHint: true },
         inputSchema: z.object({}),
         async execute(_args, signal) {
@@ -35,8 +35,8 @@ export const siteTools = {
         },
     }),
     moodle_list_courses: defineTool({
-        description: 'Мои курсы на сайте Moodle (куда я записан, в т. ч. как преподаватель): id, ' +
-            'короткое и полное название, даты, видимость. id курса нужен для ' +
+        description: 'My courses on the Moodle site (where I am enrolled, including as a teacher): id, ' +
+            'short and full name, dates, visibility. The course id is needed for ' +
             'moodle_list_assignments.',
         annotations: { readOnlyHint: true, idempotentHint: true },
         inputSchema: z.object({}),

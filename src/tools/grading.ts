@@ -39,14 +39,14 @@ interface AssignmentsResponse {
 export function validateGrade(gradeSetting: number, grade: number): void {
   const type = describeGradeType(gradeSetting);
   if (type.type === 'none') {
-    throw new Error('Задание без оценки (grade = 0): ставить оценку некуда.');
+    throw new Error('The assignment has no grade (grade = 0): nothing to grade.');
   }
   if (type.type === 'points' && (grade < 0 || grade > type.max)) {
-    throw new Error(`Оценка ${grade} вне диапазона задания 0…${type.max}.`);
+    throw new Error(`Grade ${grade} is outside the assignment range 0…${type.max}.`);
   }
   if (type.type === 'scale' && (!Number.isInteger(grade) || grade < 1)) {
     throw new Error(
-      `Задание оценивается по шкале (id ${type.scaleId}): оценка — номер пункта шкалы, целое от 1.`,
+      `The assignment is graded on a scale (id ${type.scaleId}): the grade is the scale item number, an integer from 1.`,
     );
   }
 }
@@ -54,11 +54,11 @@ export function validateGrade(gradeSetting: number, grade: number): void {
 export const gradingTools = {
   moodle_save_grade: defineTool({
     description:
-      'Ставит оценку участнику за задание и пишет отзыв-комментарий. СТУДЕНТ УВИДИТ ' +
-      'оценку и отзыв (сразу или после публикации, если включён процесс оценивания) и ' +
-      'может получить уведомление. Вызывать только после явного подтверждения ' +
-      'преподавателем оценки и текста. Оценка проверяется по максимуму задания. Если ' +
-      'feedback не передан, прежний отзыв сохраняется без изменений.',
+      "Saves a participant's grade for an assignment and writes feedback comments. THE STUDENT " +
+      'WILL SEE the grade and feedback (immediately, or after release if marking workflow is ' +
+      'enabled) and may receive a notification. Call only after the teacher has explicitly ' +
+      'confirmed the grade and the text. The grade is checked against the assignment maximum. ' +
+      'If feedback is omitted, the existing feedback is kept unchanged.',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     inputSchema: z.object({
       assignmentId: assignmentIdSchema,
@@ -66,32 +66,39 @@ export const gradingTools = {
       grade: z
         .number()
         .min(0)
-        .describe('Оценка: баллы от 0 до максимума задания, для шкалы — номер пункта с 1'),
+        .describe(
+          'Grade: points from 0 to the assignment maximum; for a scale, the item number from 1',
+        ),
       feedback: z
         .string()
         .optional()
-        .describe('Отзыв-комментарий для студента; не передан — прежний отзыв остаётся'),
+        .describe('Feedback comments for the student; if omitted, the existing feedback is kept'),
       feedbackFormat: z
         .enum(['plain', 'markdown', 'html'])
         .default('plain')
         .describe(
-          'Формат feedback: plain — простой текст (абзацы через пустую строку), markdown, html',
+          'feedback format: plain — plain text (paragraphs separated by a blank line), markdown, html',
         ),
-      attemptNumber: z.number().int().min(-1).default(-1).describe('Номер попытки; -1 — последняя'),
+      attemptNumber: z
+        .number()
+        .int()
+        .min(-1)
+        .default(-1)
+        .describe('Attempt number; -1 means the latest'),
       addAttempt: z
         .boolean()
         .default(false)
-        .describe('Открыть студенту новую попытку (если задание это разрешает)'),
+        .describe('Open a new attempt for the student (if the assignment allows it)'),
       workflowState: z
         .string()
         .optional()
         .describe(
-          'Состояние процесса оценивания (если он включён): notmarked, inmarking, readyforreview, inreview, readyforrelease, released',
+          'Marking workflow state (if enabled): notmarked, inmarking, readyforreview, inreview, readyforrelease, released',
         ),
       applyToAll: z
         .boolean()
         .default(true)
-        .describe('Для командных заданий — применить оценку ко всей группе'),
+        .describe('For group assignments, apply the grade to the whole group'),
     }),
     async execute(args, signal) {
       const opts = reqOpts(signal);
@@ -115,7 +122,7 @@ export const gradingTools = {
           .find((a) => a.id === args.assignmentId)?.grade;
       }
       if (gradeSetting === undefined) {
-        throw new Error(`Не удалось прочитать настройку оценки задания ${args.assignmentId}.`);
+        throw new Error(`Cannot read the grade setting of assignment ${args.assignmentId}.`);
       }
       validateGrade(gradeSetting, args.grade);
 

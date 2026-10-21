@@ -9,18 +9,18 @@ export const courseIdSchema = z
   .number()
   .int()
   .positive()
-  .describe('id курса (из moodle_list_courses или адреса course/view.php?id=…)');
+  .describe('Course id (from moodle_list_courses or the course/view.php?id=… URL)');
 
 export const assignmentIdSchema = z
   .number()
   .int()
   .positive()
   .describe(
-    'id задания из moodle_list_assignments (поле id, НЕ cmid из адреса mod/assign/view.php?id=…)',
+    'Assignment id from moodle_list_assignments (the id field, NOT the cmid from the mod/assign/view.php?id=… URL)',
   );
 
 export const userIdSchema = z
   .number()
   .int()
   .positive()
-  .describe('id участника (userId из moodle_list_submissions)');
+  .describe('Participant id (userId from moodle_list_submissions)');

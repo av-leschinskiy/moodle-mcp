@@ -216,7 +216,7 @@ export class MoodleClient {
       await sleep(BACKOFF_BASE_MS * 2 ** attempt, options?.signal);
     }
     if (!response) {
-      throw new MoodleRequestError('network', wsfunction, 'запрос не дал ответа');
+      throw new MoodleRequestError('network', wsfunction, 'request returned no response');
     }
 
     const text = await response.text().catch(() => '');
@@ -236,7 +236,7 @@ export class MoodleClient {
       throw new MoodleRequestError(
         'parse',
         wsfunction,
-        `ответ не JSON: ${scrub(text.slice(0, 200), token)}`,
+        `response is not JSON: ${scrub(text.slice(0, 200), token)}`,
         { statusCode: response.status },
       );
     }
@@ -256,21 +256,23 @@ export class MoodleClient {
     try {
       url = new URL(fileUrl);
     } catch {
-      throw new Error('fileUrl — не абсолютный URL.');
+      throw new Error('fileUrl is not an absolute URL.');
     }
     const site = new URL(this.siteUrl);
     if (url.origin !== site.origin) {
-      throw new Error(`fileUrl ведёт не на ${site.origin} — качаю только файлы этого сайта.`);
+      throw new Error(
+        `fileUrl does not point to ${site.origin}; only files from this site can be downloaded.`,
+      );
     }
     const sitePath = site.pathname.replace(/\/+$/, '');
     const rel = url.pathname.slice(sitePath.length);
     if (!url.pathname.startsWith(sitePath)) {
-      throw new Error('fileUrl вне пути сайта Moodle.');
+      throw new Error('fileUrl is outside the Moodle site path.');
     }
     if (rel.startsWith('/pluginfile.php/')) {
       url.pathname = `${sitePath}/webservice${rel}`;
     } else if (!rel.startsWith('/webservice/pluginfile.php/')) {
-      throw new Error('fileUrl — не ссылка на файл Moodle (ожидался …/pluginfile.php/…).');
+      throw new Error('fileUrl is not a Moodle file URL (expected …/pluginfile.php/…).');
     }
     url.searchParams.delete('token');
     url.searchParams.delete('wstoken');

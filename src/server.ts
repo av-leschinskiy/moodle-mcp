@@ -23,14 +23,14 @@ import { VERSION, BASE_COMMIT_SHORT, BUILD_DATE, PACKAGE_NAME } from './version.
 // каждый токен идёт в КАЖДЫЙ запрос. Конкретику по параметрам пишем в
 // .describe() Zod-схем.
 const SERVER_INSTRUCTIONS = [
-  'MCP-сервер для Moodle: курсы, задания (mod_assign), сдачи студентов, оценивание.',
+  'Moodle MCP server for teachers: courses, assignments (mod_assign), student submissions, grading.',
   '',
-  'Обычная цепочка проверки: moodle_list_courses → moodle_list_assignments(courseId) →',
+  'Typical grading flow: moodle_list_courses → moodle_list_assignments(courseId) →',
   'moodle_list_submissions(assignmentId, status=needs_grading) → moodle_get_submission →',
-  'moodle_download_file для файлов. assignmentId — поле id задания, не cmid из адреса.',
+  'moodle_download_file for files. assignmentId is the assignment id field, not the cmid from the URL.',
   '',
-  'moodle_save_grade пишет оценку и отзыв, которые увидит студент: вызывать только',
-  'после того, как преподаватель явно подтвердил оценку и текст отзыва.',
+  'moodle_save_grade writes a grade and feedback that the student will see: call it only',
+  'after the teacher has explicitly confirmed the grade and the feedback text.',
 ].join('\n');
 
 /**
@@ -46,7 +46,7 @@ function capText(text: string): string {
   return (
     text.slice(0, MAX_TEXT_CHARS) +
     `\n…truncated ${text.length - MAX_TEXT_CHARS} of ${text.length} chars. ` +
-    'Сузьте запрос (фильтр status) либо возьмите данные из structuredContent.'
+    'Narrow the request (status filter) or use structuredContent.'
   );
 }
 
@@ -166,7 +166,7 @@ export async function runServer(): Promise<void> {
     void server
       .close()
       .catch((error: unknown) => {
-        log('error', `Ошибка закрытия транспорта: ${describeError(error)}`);
+        log('error', `Failed to close transport: ${describeError(error)}`);
       })
       .finally(() => {
         process.exit(0);

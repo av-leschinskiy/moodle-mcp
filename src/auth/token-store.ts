@@ -21,7 +21,7 @@ import { PACKAGE_NAME } from '../version.js';
  * Подсказка войти заново. Команда — через `-p`: без него npx искал бы пакет
  * с именем команды, а `moodle-mcp-login` в npm — чужое, никем не занятое имя.
  */
-export const LOGIN_HINT = `Выполните: npx -y -p ${PACKAGE_NAME} moodle-mcp-login`;
+export const LOGIN_HINT = `Run: npx -y -p ${PACKAGE_NAME} moodle-mcp-login`;
 
 const tokenFileSchema = z.object({
   /** wwwroot сайта, для которого выпущен токен. */
@@ -43,18 +43,18 @@ export async function readToken(path: string): Promise<StoredToken | null> {
     raw = await readFile(path, 'utf8');
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') return null;
-    throw new Error(`Не удалось прочитать файл токена ${path} (${errorCode(err)}).`);
+    throw new Error(`Cannot read token file ${path} (${errorCode(err)}).`);
   }
 
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error(`Файл токена ${path} не соответствует формату. ${LOGIN_HINT}`);
+    throw new Error(`Token file ${path} has an invalid format. ${LOGIN_HINT}`);
   }
   const parsed = tokenFileSchema.safeParse(json);
   if (!parsed.success) {
-    throw new Error(`Файл токена ${path} не соответствует формату. ${LOGIN_HINT}`);
+    throw new Error(`Token file ${path} has an invalid format. ${LOGIN_HINT}`);
   }
   return parsed.data;
 }
@@ -89,11 +89,11 @@ export async function getToken(): Promise<string> {
 
   const stored = await readToken(cfg.MOODLE_TOKEN_FILE);
   if (!stored) {
-    throw new Error(`Нет файла токена ${cfg.MOODLE_TOKEN_FILE}. ${LOGIN_HINT}`);
+    throw new Error(`Token file ${cfg.MOODLE_TOKEN_FILE} not found. ${LOGIN_HINT}`);
   }
   if (normalizeSiteUrl(stored.site) !== cfg.MOODLE_URL) {
     throw new Error(
-      `Токен в ${cfg.MOODLE_TOKEN_FILE} выпущен для ${stored.site}, а MOODLE_URL = ${cfg.MOODLE_URL}. ${LOGIN_HINT}`,
+      `Token in ${cfg.MOODLE_TOKEN_FILE} was issued for ${stored.site}, but MOODLE_URL = ${cfg.MOODLE_URL}. ${LOGIN_HINT}`,
     );
   }
   return stored.token;
@@ -104,5 +104,5 @@ function isNodeError(err: unknown): err is NodeJS.ErrnoException {
 }
 
 function errorCode(err: unknown): string {
-  return isNodeError(err) && err.code ? err.code : 'неизвестная ошибка';
+  return isNodeError(err) && err.code ? err.code : 'unknown error';
 }

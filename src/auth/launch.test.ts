@@ -64,22 +64,22 @@ describe('parseLaunchRedirect', () => {
     } catch (err) {
       message = (err as Error).message;
     }
-    expect(message).toMatch(/Подпись/);
+    expect(message).toMatch(/signature mismatch/);
     expect(message).not.toContain('secret-token-value');
   });
 
   it('подпись зависит от точного адреса сайта', () => {
     expect(() =>
       parseLaunchRedirect(redirectFor([signature, 'tok']), `${SITE}/`, PASSPORT),
-    ).toThrow(/Подпись/);
+    ).toThrow(/signature mismatch/);
   });
 
   it('не тот формат — понятная ошибка', () => {
     expect(() => parseLaunchRedirect('moodlemobile://other', SITE, PASSPORT)).toThrow(
-      /не содержит/,
+      /does not contain/,
     );
     expect(() => parseLaunchRedirect(redirectFor(['onlyone']), SITE, PASSPORT)).toThrow(
-      /не разобран/,
+      /Cannot parse/,
     );
   });
 });

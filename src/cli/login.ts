@@ -37,7 +37,7 @@ const LOGIN_TIMEOUT_MS = 10 * 60_000;
 const CHROME_START_TIMEOUT_MS = 30_000;
 
 function clock(date: Date): string {
-  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
 async function main(): Promise<void> {
@@ -51,9 +51,7 @@ async function main(): Promise<void> {
 
   const chrome = launchChrome(binary, CHROME_PROFILE_DIR);
   const spawnError = new Promise<never>((_resolve, reject) => {
-    chrome.once('error', (err) =>
-      reject(new Error(`Не удалось запустить ${binary}: ${err.message}`)),
-    );
+    chrome.once('error', (err) => reject(new Error(`Failed to start ${binary}: ${err.message}`)));
   });
 
   try {
@@ -64,8 +62,8 @@ async function main(): Promise<void> {
 
     const passport = newPassport();
     process.stderr.write(
-      `Войдите на ${site} в открывшемся окне Chrome. ` +
-        `Жду до ${clock(new Date(Date.now() + LOGIN_TIMEOUT_MS))}.\n`,
+      `Log in to ${site} in the Chrome window that opened. ` +
+        `Waiting until ${clock(new Date(Date.now() + LOGIN_TIMEOUT_MS))}.\n`,
     );
     const { redirect, closeBrowser } = await captureLaunchRedirect({
       wsUrl: `ws://127.0.0.1:${port}${browserPath}`,
@@ -87,7 +85,7 @@ async function main(): Promise<void> {
     const info = await client.call<{ fullname?: string; siteurl?: string }>(WS.siteInfo);
     if (info.siteurl && normalizeSiteUrl(info.siteurl) !== site) {
       process.stderr.write(
-        `Внимание: сайт называет себя ${info.siteurl}, а MOODLE_URL = ${site}.\n`,
+        `Warning: the site reports itself as ${info.siteurl}, but MOODLE_URL = ${site}.\n`,
       );
     }
 
@@ -96,7 +94,7 @@ async function main(): Promise<void> {
       token,
       ...(privatetoken ? { privatetoken } : {}),
     });
-    process.stdout.write(`Вошёл как ${info.fullname ?? '(без имени)'} на ${site}\n`);
+    process.stdout.write(`Logged in as ${info.fullname ?? '(no name)'} on ${site}\n`);
   } finally {
     if (chrome.exitCode === null && chrome.signalCode === null) chrome.kill('SIGTERM');
   }
@@ -107,7 +105,7 @@ main().then(
   (err: unknown) => {
     // scrub — страховка: ни одна ветка выше токен в текст не кладёт.
     const message = scrub(err instanceof Error ? err.message : String(err));
-    process.stderr.write(`[moodle-mcp-login] Ошибка: ${message}\n`);
+    process.stderr.write(`[moodle-mcp-login] Error: ${message}\n`);
     process.exit(1);
   },
 );

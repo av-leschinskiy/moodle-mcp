@@ -60,7 +60,7 @@ export const envSchema = z.object({
     .string()
     .url()
     .transform(normalizeSiteUrl)
-    .describe('Адрес сайта Moodle (wwwroot), например `https://moodle.example.org`'),
+    .describe('Moodle site address (wwwroot), e.g. `https://moodle.example.org`'),
 
   /**
    * Формат `{"site","token","privatetoken"}`, права 0600. Пишет его
@@ -70,20 +70,20 @@ export const envSchema = z.object({
   MOODLE_TOKEN_FILE: z
     .string()
     .default(join(CONFIG_DIR, 'token.json'))
-    .describe('Куда `moodle-mcp-login` сохраняет токен (путь резолвится через `homedir()`)'),
+    .describe('Where `moodle-mcp-login` saves the token (path is resolved via `homedir()`)'),
 
   /**
    * Если задан — используется как есть, файл токена не читается и проверка
    * сайта не делается: это ручной режим для CI и смок-прогонов.
    */
-  MOODLE_TOKEN: z.string().optional().describe('Override токена веб-сервиса (CI / смок-тесты)'),
+  MOODLE_TOKEN: z.string().optional().describe('Web service token override (CI / smoke tests)'),
 
   MOODLE_TIMEOUT: z.coerce
     .number()
     .int()
     .positive()
     .default(30_000)
-    .describe('Таймаут одного запроса к API (мс)'),
+    .describe('Timeout of a single API request (ms)'),
 
   /**
    * Нужен только `moodle-mcp-login`. Без него ищутся по PATH
@@ -92,7 +92,7 @@ export const envSchema = z.object({
   MOODLE_CHROME: z
     .string()
     .optional()
-    .describe('Бинарь Chrome/Chromium для `moodle-mcp-login` (по умолчанию ищется в PATH)'),
+    .describe('Chrome/Chromium binary for `moodle-mcp-login` (looked up in PATH by default)'),
 
   /**
    * Влияет на два канала: порог stderr-вывода и уровень `debug` в
@@ -101,7 +101,9 @@ export const envSchema = z.object({
   MOODLE_DEBUG: z
     .preprocess(toFlag, z.boolean())
     .default(false)
-    .describe('`1`/`true`/`yes`/`on` — отладочный вывод в stderr и уровень `debug` в канал хоста'),
+    .describe(
+      '`1`/`true`/`yes`/`on` enables debug output to stderr and `debug` level in the host log channel',
+    ),
 });
 
 export type Config = z.infer<typeof envSchema>;
@@ -142,7 +144,7 @@ export function getConfig(): Config {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
       .join('\n');
-    throw new Error(`Некорректная конфигурация окружения:\n${issues}`);
+    throw new Error(`Invalid environment configuration:\n${issues}`);
   }
 
   cached = parsed.data;

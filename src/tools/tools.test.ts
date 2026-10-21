@@ -538,7 +538,7 @@ describe('moodle_save_grade', () => {
 
   it('validateGrade: шкала — целое от 1, без оценки — отказ', () => {
     expect(() => validateGrade(-3, 2)).not.toThrow();
-    expect(() => validateGrade(-3, 1.5)).toThrow(/шкал/);
-    expect(() => validateGrade(0, 1)).toThrow(/без оценки/);
+    expect(() => validateGrade(-3, 1.5)).toThrow(/scale/);
+    expect(() => validateGrade(0, 1)).toThrow(/has no grade/);
   });
 });

@@ -216,7 +216,7 @@ describe('MoodleClient.normalizeFileUrl', () => {
 
   it('чужой сайт и не-файловые адреса отклоняет — токен туда не уйдёт', () => {
     expect(() => client.normalizeFileUrl('https://evil.example.com/pluginfile.php/1/a')).toThrow(
-      /не на/,
+      /does not point to/,
     );
     expect(() => client.normalizeFileUrl(`${FAKE_SITE}/login/index.php`)).toThrow(/pluginfile/);
     expect(() => client.normalizeFileUrl('not a url')).toThrow();

@@ -47,27 +47,24 @@ async function freePath(dir: string, name: string): Promise<string> {
 export const filesTools = {
   moodle_download_file: defineTool({
     description:
-      'Скачивает файл сдачи (или вложение задания) на локальный диск и возвращает путь. ' +
-      'fileUrl — поле url из moodle_get_submission или moodle_list_assignments. ' +
-      'Существующий файл не перезаписывается: к имени добавляется « (1)».',
+      'Downloads a submission file (or an assignment attachment) to the local disk and returns its path. ' +
+      'fileUrl is the url field from moodle_get_submission or moodle_list_assignments. ' +
+      'An existing file is not overwritten: " (1)" is appended to the name.',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: z.object({
-      fileUrl: z
-        .string()
-        .url()
-        .describe('Ссылка на файл Moodle (…/pluginfile.php/…) с этого сайта'),
+      fileUrl: z.string().url().describe('Moodle file URL (…/pluginfile.php/…) on this site'),
       destDir: z
         .string()
         .min(1)
-        .refine(isAbsolute, 'нужен абсолютный путь')
-        .describe('Абсолютный путь каталога для сохранения; создаётся, если его нет'),
+        .refine(isAbsolute, 'absolute path required')
+        .describe('Absolute path of the directory to save to; created if missing'),
     }),
     async execute(args, signal) {
       const { url, response } = await getMoodleClient().openFile(args.fileUrl, reqOpts(signal));
       await mkdir(args.destDir, { recursive: true });
       const path = await freePath(args.destDir, safeFileName(url));
 
-      if (!response.body) throw new Error('Moodle вернул пустой ответ вместо файла.');
+      if (!response.body) throw new Error('Moodle returned an empty response instead of a file.');
       try {
         await pipeline(
           Readable.fromWeb(response.body as WebReadableStream<Uint8Array>),

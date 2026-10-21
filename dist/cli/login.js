@@ -28,7 +28,7 @@ const LOGIN_TIMEOUT_MS = 10 * 60_000;
 /** Сколько ждать, пока Chrome откроет порт отладки. */
 const CHROME_START_TIMEOUT_MS = 30_000;
 function clock(date) {
-    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 async function main() {
     const cfg = getConfig();
@@ -39,7 +39,7 @@ async function main() {
     await rm(join(CHROME_PROFILE_DIR, 'DevToolsActivePort'), { force: true });
     const chrome = launchChrome(binary, CHROME_PROFILE_DIR);
     const spawnError = new Promise((_resolve, reject) => {
-        chrome.once('error', (err) => reject(new Error(`Не удалось запустить ${binary}: ${err.message}`)));
+        chrome.once('error', (err) => reject(new Error(`Failed to start ${binary}: ${err.message}`)));
     });
     try {
         const { port, browserPath } = await Promise.race([
@@ -47,8 +47,8 @@ async function main() {
             spawnError,
         ]);
         const passport = newPassport();
-        process.stderr.write(`Войдите на ${site} в открывшемся окне Chrome. ` +
-            `Жду до ${clock(new Date(Date.now() + LOGIN_TIMEOUT_MS))}.\n`);
+        process.stderr.write(`Log in to ${site} in the Chrome window that opened. ` +
+            `Waiting until ${clock(new Date(Date.now() + LOGIN_TIMEOUT_MS))}.\n`);
         const { redirect, closeBrowser } = await captureLaunchRedirect({
             wsUrl: `ws://127.0.0.1:${port}${browserPath}`,
             startUrl: buildLaunchUrl(site, passport),
@@ -66,14 +66,14 @@ async function main() {
         });
         const info = await client.call(WS.siteInfo);
         if (info.siteurl && normalizeSiteUrl(info.siteurl) !== site) {
-            process.stderr.write(`Внимание: сайт называет себя ${info.siteurl}, а MOODLE_URL = ${site}.\n`);
+            process.stderr.write(`Warning: the site reports itself as ${info.siteurl}, but MOODLE_URL = ${site}.\n`);
         }
         await writeToken(cfg.MOODLE_TOKEN_FILE, {
             site,
             token,
             ...(privatetoken ? { privatetoken } : {}),
         });
-        process.stdout.write(`Вошёл как ${info.fullname ?? '(без имени)'} на ${site}\n`);
+        process.stdout.write(`Logged in as ${info.fullname ?? '(no name)'} on ${site}\n`);
     }
     finally {
         if (chrome.exitCode === null && chrome.signalCode === null)
@@ -83,7 +83,7 @@ async function main() {
 main().then(() => process.exit(0), (err) => {
     // scrub — страховка: ни одна ветка выше токен в текст не кладёт.
     const message = scrub(err instanceof Error ? err.message : String(err));
-    process.stderr.write(`[moodle-mcp-login] Ошибка: ${message}\n`);
+    process.stderr.write(`[moodle-mcp-login] Error: ${message}\n`);
     process.exit(1);
 });
 //# sourceMappingURL=login.js.map

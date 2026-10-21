@@ -52,7 +52,7 @@ export function findChrome(
     }
   }
   throw new Error(
-    `Chrome не найден в PATH (искал: ${CHROME_CANDIDATES.join(', ')}). Укажите бинарь в MOODLE_CHROME.`,
+    `Chrome not found in PATH (looked for: ${CHROME_CANDIDATES.join(', ')}). Set the binary path in MOODLE_CHROME.`,
   );
 }
 
@@ -65,7 +65,7 @@ export function parseDevToolsActivePort(text: string): { port: number; browserPa
   const [portLine, pathLine] = text.split(/\r?\n/);
   const port = Number(portLine);
   if (!Number.isInteger(port) || port <= 0 || !pathLine?.startsWith('/devtools/browser/')) {
-    throw new Error('DevToolsActivePort не разобран.');
+    throw new Error('Cannot parse DevToolsActivePort.');
   }
   return { port, browserPath: pathLine.trim() };
 }
@@ -93,7 +93,7 @@ export async function waitForDevToolsPort(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (chrome.exitCode !== null) {
-      throw new Error(`Chrome завершился до старта (код ${chrome.exitCode}).`);
+      throw new Error(`Chrome exited before startup (code ${chrome.exitCode}).`);
     }
     try {
       return parseDevToolsActivePort(
@@ -103,7 +103,7 @@ export async function waitForDevToolsPort(
       await new Promise((r) => setTimeout(r, 200));
     }
   }
-  throw new Error('Chrome не открыл порт отладки вовремя.');
+  throw new Error('Chrome did not open the debugging port in time.');
 }
 
 interface CdpMessage {
@@ -152,13 +152,9 @@ export async function captureLaunchRedirect(opts: {
   const ws = new WebSocket(opts.wsUrl);
   await new Promise<void>((resolve, reject) => {
     ws.addEventListener('open', () => resolve(), { once: true });
-    ws.addEventListener(
-      'error',
-      () => reject(new Error('CDP: не удалось подключиться к Chrome.')),
-      {
-        once: true,
-      },
-    );
+    ws.addEventListener('error', () => reject(new Error('CDP: failed to connect to Chrome.')), {
+      once: true,
+    });
   });
 
   let nextId = 0;
@@ -182,11 +178,11 @@ export async function captureLaunchRedirect(opts: {
     let navigated = false;
 
     const timer = setTimeout(() => {
-      reject(new Error('Вход не завершён вовремя.'));
+      reject(new Error('Login did not complete in time.'));
     }, opts.timeoutMs);
     const onExit = (): void => {
       clearTimeout(timer);
-      reject(new Error('Окно Chrome закрыто до завершения входа.'));
+      reject(new Error('Chrome window was closed before login completed.'));
     };
     opts.chrome.once('exit', onExit);
     const done = (url: string): void => {

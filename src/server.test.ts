@@ -53,7 +53,7 @@ describe('регистрация тулов', () => {
       .map((t) => t.name);
     expect(destructive).toEqual(['moodle_save_grade']);
     expect(tools.find((t) => t.name === 'moodle_save_grade')?.description).toMatch(
-      /СТУДЕНТ УВИДИТ/,
+      /THE STUDENT WILL SEE/,
     );
     expect(tools.find((t) => t.name === 'moodle_list_submissions')?.annotations).toMatchObject({
       readOnlyHint: true,

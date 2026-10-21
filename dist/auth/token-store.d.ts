@@ -15,7 +15,7 @@ import { z } from 'zod';
  * Подсказка войти заново. Команда — через `-p`: без него npx искал бы пакет
  * с именем команды, а `moodle-mcp-login` в npm — чужое, никем не занятое имя.
  */
-export declare const LOGIN_HINT = "\u0412\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0435: npx -y -p @av-leschinskiy/moodle-mcp moodle-mcp-login";
+export declare const LOGIN_HINT = "Run: npx -y -p @av-leschinskiy/moodle-mcp moodle-mcp-login";
 declare const tokenFileSchema: z.ZodObject<{
     /** wwwroot сайта, для которого выпущен токен. */
     site: z.ZodString;

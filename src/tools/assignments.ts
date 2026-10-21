@@ -208,9 +208,10 @@ const SUBMISSION_FILTERS = [
 export const assignmentsTools = {
   moodle_list_assignments: defineTool({
     description:
-      'Задания курса (модуль «Задание», mod_assign): id задания (нужен остальным тулам), cmid — ' +
-      'номер из адреса mod/assign/view.php?id=…, название, даты открытия/срока/запрета, ' +
-      'оценивание (баллы с максимумом или шкала, проходной балл), типы сдачи и текст задания.',
+      'Assignments of a course (Assignment activity, mod_assign): assignment id (needed by the other ' +
+      'tools), cmid (the number from the mod/assign/view.php?id=… URL), name, allow submissions ' +
+      'from / due / cut-off dates, grading (points with maximum or scale, grade to pass), ' +
+      'submission types and assignment description.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: z.object({ courseId: courseIdSchema }),
     async execute(args, signal) {
@@ -238,7 +239,7 @@ export const assignmentsTools = {
           } catch (err) {
             log(
               'warning',
-              `gradepass для cmid ${a.cmid} не получен:`,
+              `gradepass for cmid ${a.cmid} not received:`,
               err instanceof Error ? err.message : err,
             );
             return null;
@@ -276,10 +277,10 @@ export const assignmentsTools = {
 
   moodle_list_submissions: defineTool({
     description:
-      'Участники задания и состояние их сдач: статус (new — не сдавал, draft — черновик, ' +
-      'submitted — сдано, reopened — открыта новая попытка), время сдачи, требует ли ' +
-      'оценивания, текущая оценка. Фильтр status сужает список; counts — сводка по всем. ' +
-      'Полную сдачу одного участника отдаёт moodle_get_submission.',
+      'Assignment participants and their submission state: status (new: not submitted, draft: ' +
+      'draft, submitted: submitted, reopened: new attempt opened), submission time, whether it ' +
+      'needs grading, current grade. The status filter narrows the list; counts summarizes all ' +
+      "participants. moodle_get_submission returns one participant's full submission.",
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: z.object({
       assignmentId: assignmentIdSchema,
@@ -287,8 +288,8 @@ export const assignmentsTools = {
         .enum(SUBMISSION_FILTERS)
         .default('all')
         .describe(
-          'Фильтр: all — все; submitted — сдали; needs_grading — сдали и ждут оценки; ' +
-            'graded — есть оценка; not_submitted — не сдали; draft — черновик',
+          'Filter: all — everyone; submitted — submitted; needs_grading — submitted and awaiting ' +
+            'grading; graded — has a grade; not_submitted — not submitted; draft — draft',
         ),
     }),
     async execute(args, signal) {
@@ -365,9 +366,9 @@ export const assignmentsTools = {
 
   moodle_get_submission: defineTool({
     description:
-      'Сдача одного участника целиком: статус и номер попытки, время, текст ответа ' +
-      '(онлайн-текст, в простом тексте), прикреплённые файлы (имя, размер, url для ' +
-      'moodle_download_file), текущая оценка и отзыв преподавателя.',
+      'Full submission of one participant: status and attempt number, time, online text ' +
+      '(as plain text), attached files (name, size, url for moodle_download_file), ' +
+      'current grade and teacher feedback.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: z.object({ assignmentId: assignmentIdSchema, userId: userIdSchema }),
     async execute(args, signal) {
