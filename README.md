@@ -52,7 +52,7 @@ MOODLE_URL=https://moodle.example.org node dist/cli/login.js
 node /абсолютный/путь/к/moodle-mcp/dist/index.js` (`-s user` — для всех
 проектов). Если репозиторий опубликован в git, вместо `node …/dist/index.js`
 подходит `npx -y git+ssh://<адрес репозитория>`: `dist/` закоммичен, сборка у
-пользователя не нужна; вход тогда — `npx -y git+ssh://<адрес> moodle-mcp-login`.
+пользователя не нужна; вход тогда — `npx -y -p git+ssh://<адрес> moodle-mcp-login` (без `-p` npx запустит сервер, а не вход).
 
 Проверка: попросите ассистента «покажи мои курсы в Moodle».
 
