@@ -25,12 +25,13 @@
     "docs:tools:check": "node scripts/tool-docs.mjs --check",
     "docs:env": "node scripts/env-docs.mjs",
     "docs:env:check": "node scripts/env-docs.mjs --check",
-    "docs:check": "npm run docs:tools:check && npm run docs:env:check",
+    "docs:check": "npm run docs:tools:check && npm run docs:env:check && npm run docs:atoms:check",
     "verify:fast": "npm run typecheck && npm run lint",
     "verify": "npm run typecheck && npm run lint && npm test && npm run docs:check",
     "smoke": "node scripts/smoke.mjs",
     "login": "tsx src/cli/login.ts",
-    "typecheck": "node scripts/tsc.mjs -p tsconfig.typecheck.json"
+    "typecheck": "node scripts/tsc.mjs -p tsconfig.typecheck.json",
+    "docs:atoms:check": "node scripts/docs-atoms.mjs"
   },
   "keywords": [
     "mcp",

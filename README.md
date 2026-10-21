@@ -27,7 +27,7 @@ Moodle в точности так, как он выглядит в браузе�
 git clone <адрес этого репозитория> ~/projects/moodle-mcp
 cd ~/projects/moodle-mcp && npm install
 
-# 1. Вход (один раз; повторять, когда токен перестанет работать)
+# 1. Вход: когда входить заново и что гарантирует команда — docs/features/login.md
 MOODLE_URL=https://moodle.example.org node dist/cli/login.js
 #    Откроется окно Chrome: войдите на сайт как обычно (капчу проходите сами).
 #    Команда напишет «Вошёл как <имя> на <сайт>» и закроет окно.

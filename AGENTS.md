@@ -13,6 +13,9 @@ MCP-сервер над REST API веб-сервисов Moodle: курсы, з�
 
 CI нет: барьер — pre-commit (см. «Грабли») и `npm run verify` перед пушем.
 
+`docs/` ведётся атомами по скиллу `writing-doc-atoms`, словарь тегов —
+`docs/_tags.json`, нормы проекта — [Нормы документации](docs/conventions/documentation.md).
+
 ## Правила
 
 - **Токен не печатать.** Ни в stdout, ни в логи, ни в тексты ошибок и ответы
@@ -71,14 +74,11 @@ npm run login        # moodle-mcp-login из исходников
 - **Токен:** `src/auth/token-store.ts` — файл `{"site","token","privatetoken"}`
   (0600, атомарная запись через rename), `getToken()` — `MOODLE_TOKEN` либо
   файл с проверкой, что сайт совпал с `MOODLE_URL`.
-- **Логин:** `src/cli/login.ts` (bin `moodle-mcp-login`) — Chrome с окном и
-  отдельным профилем, `--remote-debugging-port=0` (порт из `DevToolsActivePort`),
-  открывает `launch.php` мобильного сервиса и ждёт, пока человек войдёт; через
-  CDP перехватывает редирект `moodlemobile://token=…` во всех вкладках, проверяет
-  подпись md5(wwwroot + passport), проверяет токен вызовом API и только потом
-  пишет файл. Ввод не автоматизируется. Протокол — `src/auth/launch.ts`
-  (чистые функции, покрыты тестами), браузер — `src/cli/chrome.ts`; `login.ts`
-  исполняет `main()` на импорте, поэтому логики в нём нет.
+- **Логин:** модель, инварианты и причины устройства —
+  [Вход в Moodle и токен сервера](docs/features/login.md). Протокол —
+  `src/auth/launch.ts` (чистые функции, покрыты тестами), браузер —
+  `src/cli/chrome.ts`; `src/cli/login.ts` исполняет `main()` на импорте,
+  поэтому логики в нём нет.
 - **Форматирование ответов:** `src/utils/format.ts` — HTML → текст, текст →
   HTML для отзыва, unix-время → ISO, оценка `-1` → `null`, знак поля `grade`
   задания (баллы / шкала / без оценки).
