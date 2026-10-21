@@ -145,7 +145,7 @@ export declare const allTools: {
         assignmentId: import("zod").ZodNumber;
         userId: import("zod").ZodNumber;
         grade: import("zod").ZodNumber;
-        feedback: import("zod").ZodOptional<import("zod").ZodString>;
+        feedback: import("zod").ZodString;
         feedbackFormat: import("zod").ZodDefault<import("zod").ZodEnum<["plain", "markdown", "html"]>>;
         attemptNumber: import("zod").ZodDefault<import("zod").ZodNumber>;
         addAttempt: import("zod").ZodDefault<import("zod").ZodBoolean>;
@@ -155,7 +155,7 @@ export declare const allTools: {
         assignmentId: number;
         userId: number;
         grade: number;
-        feedback?: string | undefined;
+        feedback: string;
         feedbackFormat: "html" | "markdown" | "plain";
         attemptNumber: number;
         addAttempt: boolean;
@@ -165,7 +165,7 @@ export declare const allTools: {
         assignmentId: number;
         userId: number;
         grade: number;
-        feedback?: string | undefined;
+        feedback: string;
         feedbackFormat?: "html" | "markdown" | "plain" | undefined;
         attemptNumber?: number | undefined;
         addAttempt?: boolean | undefined;

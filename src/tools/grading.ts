@@ -58,7 +58,8 @@ export const gradingTools = {
       'WILL SEE the grade and feedback (immediately, or after release if marking workflow is ' +
       'enabled) and may receive a notification. Call only after the teacher has explicitly ' +
       'confirmed the grade and the text. The grade is checked against the assignment maximum. ' +
-      'If feedback is omitted, the existing feedback is kept unchanged.',
+      'Feedback is required: Moodle saves the grade and the feedback together, so the text ' +
+      'replaces the previous feedback.',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     inputSchema: z.object({
       assignmentId: assignmentIdSchema,
@@ -71,8 +72,9 @@ export const gradingTools = {
         ),
       feedback: z
         .string()
-        .optional()
-        .describe('Feedback comments for the student; if omitted, the existing feedback is kept'),
+        .trim()
+        .min(1)
+        .describe('Feedback comments for the student; replaces the previous feedback'),
       feedbackFormat: z
         .enum(['plain', 'markdown', 'html'])
         .default('plain')
@@ -127,17 +129,10 @@ export const gradingTools = {
       validateGrade(gradeSetting, args.grade);
 
       // Плагин отзывов при сохранении перезаписывает комментарий тем, что
-      // пришло в plugindata, — отсутствие поля стёрло бы прежний отзыв.
-      // Поэтому без feedback отправляем текущий текст как есть.
+      // пришло в plugindata, поэтому отзыв обязателен: пересылка прежнего
+      // текста гоняла бы его через HTML из Moodle и ломала встроенные картинки.
       let comment: { text: string; format: number };
-      if (args.feedback === undefined) {
-        const current = await fetchSubmissionStatus(args.assignmentId, args.userId, opts);
-        const field = current.feedback?.plugins?.find((p) => p.type === 'comments')
-          ?.editorfields?.[0];
-        comment = field
-          ? { text: field.text, format: field.format }
-          : { text: '', format: FORMAT_HTML };
-      } else if (args.feedbackFormat === 'plain') {
+      if (args.feedbackFormat === 'plain') {
         comment = { text: plainToHtml(args.feedback), format: FORMAT_HTML };
       } else {
         comment = {

@@ -499,23 +499,12 @@ describe('moodle_save_grade', () => {
     expect(result).toMatchObject({ saved: true, grade: 80 });
   });
 
-  it('без feedback отправляет прежний отзыв без изменений', async () => {
-    const calls = stubGrading();
-
-    await gradingTools.moodle_save_grade.execute({
-      assignmentId: 5,
-      userId: 101,
-      grade: 50,
-      feedbackFormat: 'plain',
-      attemptNumber: -1,
-      addAttempt: false,
-      applyToAll: true,
-    });
-
-    const save = calls.find((c) => c.wsfunction === 'mod_assign_save_grade');
-    expect(save?.params['plugindata[assignfeedbackcomments_editor][text]']).toBe(
-      '<p>Прежний отзыв</p>',
-    );
+  it('без отзыва или с пустым отзывом схема не пропускает вызов', () => {
+    const schema = gradingTools.moodle_save_grade.inputSchema;
+    const base = { assignmentId: 5, userId: 101, grade: 50 };
+    expect(schema.safeParse(base).success).toBe(false);
+    expect(schema.safeParse({ ...base, feedback: '  ' }).success).toBe(false);
+    expect(schema.safeParse({ ...base, feedback: 'Хорошо' }).success).toBe(true);
   });
 
   it('оценка выше максимума не уходит в Moodle', async () => {

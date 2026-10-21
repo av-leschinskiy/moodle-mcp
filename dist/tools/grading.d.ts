@@ -13,7 +13,7 @@ export declare const gradingTools: {
         assignmentId: z.ZodNumber;
         userId: z.ZodNumber;
         grade: z.ZodNumber;
-        feedback: z.ZodOptional<z.ZodString>;
+        feedback: z.ZodString;
         feedbackFormat: z.ZodDefault<z.ZodEnum<["plain", "markdown", "html"]>>;
         attemptNumber: z.ZodDefault<z.ZodNumber>;
         addAttempt: z.ZodDefault<z.ZodBoolean>;
@@ -23,7 +23,7 @@ export declare const gradingTools: {
         assignmentId: number;
         userId: number;
         grade: number;
-        feedback?: string | undefined;
+        feedback: string;
         feedbackFormat: "html" | "markdown" | "plain";
         attemptNumber: number;
         addAttempt: boolean;
@@ -33,7 +33,7 @@ export declare const gradingTools: {
         assignmentId: number;
         userId: number;
         grade: number;
-        feedback?: string | undefined;
+        feedback: string;
         feedbackFormat?: "html" | "markdown" | "plain" | undefined;
         attemptNumber?: number | undefined;
         addAttempt?: boolean | undefined;
