@@ -11,7 +11,8 @@ MCP-сервер над REST API веб-сервисов Moodle: курсы, з�
 `moodle.example.org`). Состав тулов — раздел «Что внутри» в README
 (генерируется из `allTools`).
 
-CI нет: барьер — pre-commit (см. «Грабли») и `npm run verify` перед пушем.
+CI на коммиты нет: барьер — pre-commit (см. «Грабли») и `npm run verify` перед пушем.
+Выпуск в npm и MCP Registry — тегом, workflow `Release` ([Выпуск версии](docs/runbooks/release.md)).
 
 `docs/` ведётся атомами по скиллу `writing-doc-atoms`, словарь тегов —
 `docs/_tags.json`, нормы проекта — [Нормы документации](docs/conventions/documentation.md).

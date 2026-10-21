@@ -8,7 +8,7 @@
  * сборке были незакоммиченные правки, то есть dist мог разойтись с коммитом.
  */
 export const VERSION = "0.1.1";
-export const BASE_COMMIT = "9d2b6100f8663dfc099012e87a649efda7495cb1";
-export const BASE_COMMIT_SHORT = "9d2b610";
+export const BASE_COMMIT = "dc3c50fc9e8aa77ed45e835efa5cd47b711ea158";
+export const BASE_COMMIT_SHORT = "dc3c50f";
 export const BUILD_DATE = "2026-10-21";
 export const PACKAGE_NAME = "@av-leschinskiy/moodle-mcp";

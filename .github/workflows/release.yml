@@ -1,0 +1,47 @@
+# Выпуск по тегу v<версия>: npm (trusted publishing, без токенов) и MCP Registry
+# (вход через OIDC GitHub). Порядок выпуска и разовая настройка npm — docs/runbooks/release.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC для npm и MCP Registry
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing требует npm новее, чем идёт в комплекте с Node.
+      - run: npm install -g npm@latest
+
+      - name: Тег совпадает с версией пакета
+        run: |
+          test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME" \
+            || { echo "Тег $GITHUB_REF_NAME не совпадает с версией в package.json"; exit 1; }
+
+      - run: npm ci
+
+      # dist/ коммитится и публикуется как есть: пересборка перештамповала бы
+      # src/version.ts. Проверки (verify) сверяют таблицы и server.json с dist.
+      - run: npm run verify
+
+      - run: npm publish
+
+      - name: Установить mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+
+      - run: ./mcp-publisher login github-oidc
+
+      - run: ./mcp-publisher publish
