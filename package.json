@@ -60,7 +60,7 @@
     "typescript-eslint": "^8.59.3",
     "vitest": "^4.1.6"
   },
-  "author": "Александр Лещинский",
+  "author": "Alexander Leschinskiy",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/av-leschinskiy/moodle-mcp.git"
