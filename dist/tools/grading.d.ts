@@ -16,6 +16,16 @@ export declare const gradingTools: {
         grade: z.ZodNumber;
         feedback: z.ZodString;
         feedbackFormat: z.ZodDefault<z.ZodEnum<["plain", "markdown", "html"]>>;
+        images: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            path: z.ZodEffects<z.ZodString, string, string>;
+            alt: z.ZodOptional<z.ZodString>;
+        }, "strip", z.ZodTypeAny, {
+            path: string;
+            alt?: string | undefined;
+        }, {
+            path: string;
+            alt?: string | undefined;
+        }>, "many">>;
         attemptNumber: z.ZodDefault<z.ZodNumber>;
         addAttempt: z.ZodDefault<z.ZodBoolean>;
         workflowState: z.ZodOptional<z.ZodString>;
@@ -26,6 +36,10 @@ export declare const gradingTools: {
         grade: number;
         feedback: string;
         feedbackFormat: "html" | "markdown" | "plain";
+        images?: {
+            path: string;
+            alt?: string | undefined;
+        }[] | undefined;
         attemptNumber: number;
         addAttempt: boolean;
         workflowState?: string | undefined;
@@ -36,6 +50,10 @@ export declare const gradingTools: {
         grade: number;
         feedback: string;
         feedbackFormat?: "html" | "markdown" | "plain" | undefined;
+        images?: {
+            path: string;
+            alt?: string | undefined;
+        }[] | undefined;
         attemptNumber?: number | undefined;
         addAttempt?: boolean | undefined;
         workflowState?: string | undefined;
@@ -48,6 +66,10 @@ export declare const gradingTools: {
         gradeDisplay: string | null;
         gradedAt: string | null;
         feedback: string | null;
+        images: {
+            name: string;
+            inFeedback: boolean;
+        }[];
     }>;
     moodle_add_submission_comment: import("./types.js").ToolDef<z.ZodObject<{
         assignmentId: z.ZodNumber;

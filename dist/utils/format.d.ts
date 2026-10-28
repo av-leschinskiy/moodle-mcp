@@ -12,6 +12,7 @@
  * задания или сдачи без разметки.
  */
 export declare function htmlToText(html: string | null | undefined): string;
+export declare function escapeHtml(text: string): string;
 /**
  * Простой текст → HTML для редактора Moodle: экранирование, пустая строка —
  * новый абзац, одиночный перевод строки — `<br>`.

@@ -14,6 +14,10 @@ interface SiteInfoResponse {
     functions?: {
         name: string;
     }[];
+    /** 1 — сервис токена разрешает загрузку файлов (`webservice/upload.php`). */
+    uploadfiles?: number;
+    /** Предел размера загружаемого файла для пользователя, байты; -1 — без предела. */
+    usermaxuploadfilesize?: number;
 }
 export declare function fetchSiteInfo(options?: CallOptions): Promise<SiteInfoResponse>;
 export declare const siteTools: {
@@ -33,7 +37,9 @@ export declare const siteTools: {
             package: string;
             version: string;
         };
-        missingFunctions: ("core_comment_add_comments" | "core_comment_get_comments" | "core_course_get_course_module" | "core_course_get_course_module_by_instance" | "core_enrol_get_users_courses" | "core_webservice_get_site_info" | "mod_assign_get_assignments" | "mod_assign_get_grades" | "mod_assign_get_participant" | "mod_assign_get_submission_status" | "mod_assign_get_submissions" | "mod_assign_list_participants" | "mod_assign_revert_submissions_to_draft" | "mod_assign_save_grade")[];
+        missingFunctions: ("core_comment_add_comments" | "core_comment_get_comments" | "core_course_get_course_module" | "core_course_get_course_module_by_instance" | "core_enrol_get_users_courses" | "core_webservice_get_site_info" | "mod_assign_get_assignments" | "mod_assign_get_grades" | "mod_assign_get_participant" | "mod_assign_get_submission_status" | "mod_assign_get_submissions" | "mod_assign_list_participants" | "mod_assign_revert_submissions_to_draft" | "mod_assign_save_grade" | "mod_assign_submit_grading_form")[];
+        uploadFiles: boolean | null;
+        maxUploadBytes: number | null;
     }>;
     moodle_list_courses: import("./types.js").ToolDef<z.ZodObject<{}, "strip", z.ZodTypeAny, {}, {}>, z.ZodTypeAny, {
         items: {

@@ -325,6 +325,90 @@ export class MoodleClient {
     return { url, response };
   }
 
+  /**
+   * Кладёт файл в черновую область пользователя токена
+   * (`webservice/upload.php`) и возвращает itemid черновика и имя, под которым
+   * Moodle сохранил файл. `itemid` 0 — новый черновик, иначе файл добавляется
+   * в уже созданный. Студент черновик не видит; к отзыву его привязывает
+   * последующая запись формы оценки.
+   *
+   * Токен уходит полем тела, не в URL. Повтора нет: второй раз тот же файл
+   * в тот же черновик Moodle не примет (`filenameexist`).
+   */
+  async uploadDraftFile(
+    file: { name: string; mimeType: string; data: Uint8Array<ArrayBuffer> },
+    itemid: number,
+    options?: CallOptions,
+  ): Promise<{ itemid: number; filename: string }> {
+    const what = 'upload';
+    const token = await this.loadToken(what);
+    const form = new FormData();
+    form.set('token', token);
+    form.set('filearea', 'draft');
+    form.set('itemid', String(itemid));
+    form.set('filepath', '/');
+    form.set('file_1', new Blob([file.data], { type: file.mimeType }), file.name);
+    log('info', `upload draft file (${file.data.byteLength} bytes)`);
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.siteUrl}/webservice/upload.php`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: form,
+        signal: combineSignals(AbortSignal.timeout(this.timeoutMs), options?.signal),
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      throw new MoodleRequestError('network', what, this.describe(err, token), { cause: err });
+    }
+
+    const text = await response.text().catch(() => '');
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      const status = response.ok ? '' : `HTTP ${response.status}: `;
+      throw new MoodleRequestError(
+        response.ok ? 'parse' : 'http',
+        what,
+        `${status}response is not JSON: ${scrub(text.slice(0, 200), token)}`,
+        { statusCode: response.status },
+      );
+    }
+
+    // Исключение upload.php приходит как у AJAX-скрипта: `{error, errorcode}`,
+    // а не `{exception, …}`, как у server.php.
+    if (!Array.isArray(json)) {
+      const body = (json ?? {}) as { error?: string; errorcode?: string; exception?: string };
+      const errorcode = body.errorcode;
+      const message = scrub(body.error ?? body.exception ?? 'unexpected response', token);
+      // accessexception здесь — чаще всего выключенная загрузка файлов у
+      // сервиса токена: перелогин её не лечит, подсказку про вход не даём.
+      if (errorcode && errorcode !== 'accessexception' && AUTH_ERROR_CODES.has(errorcode)) {
+        throw new MoodleRequestError('auth', what, `${message} ${LOGIN_HINT}`, { errorcode });
+      }
+      throw new MoodleRequestError('moodle', what, `${message} [${errorcode ?? 'error'}]`, {
+        errorcode,
+        statusCode: response.status,
+      });
+    }
+
+    // Отказ по одному файлу (размер, имя занято) — элемент массива с errortype.
+    const entry = (
+      json as { filename?: string; itemid?: number; errortype?: string; error?: string }[]
+    )[0];
+    if (!entry || entry.errortype || typeof entry.itemid !== 'number' || !entry.filename) {
+      throw new MoodleRequestError(
+        'moodle',
+        what,
+        `${scrub(entry?.error ?? 'Moodle stored no file', token)} [${entry?.errortype ?? 'error'}]`,
+        { errorcode: entry?.errortype },
+      );
+    }
+    return { itemid: entry.itemid, filename: entry.filename };
+  }
+
   private async loadToken(wsfunction: string): Promise<string> {
     try {
       return await this.getToken();

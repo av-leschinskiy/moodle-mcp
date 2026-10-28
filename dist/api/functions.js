@@ -17,6 +17,7 @@ export const WS = {
     submissionStatus: 'mod_assign_get_submission_status',
     grades: 'mod_assign_get_grades',
     saveGrade: 'mod_assign_save_grade',
+    submitGradingForm: 'mod_assign_submit_grading_form',
     revertToDraft: 'mod_assign_revert_submissions_to_draft',
     comments: 'core_comment_get_comments',
     addComments: 'core_comment_add_comments',

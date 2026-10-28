@@ -3,16 +3,16 @@
  * к сдаче, возврат сдачи на доработку. Поэтому у каждого тула
  * `destructiveHint` и подтверждение хоста.
  */
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { WS } from '../api/functions.js';
-import { getMoodleClient } from '../api/moodle-client.js';
-import { describeGradeType, htmlToText, parseGrade, plainToHtml, isoTime, } from '../utils/format.js';
+import { encodeParams, getMoodleClient } from '../api/moodle-client.js';
+import { composeFeedback, loadFeedbackImages, MAX_FEEDBACK_IMAGE_BYTES, MAX_FEEDBACK_IMAGES, } from '../utils/feedback-images.js';
+import { describeGradeType, htmlToText, parseGrade, isoTime } from '../utils/format.js';
 import { assignmentIdSchema, userIdSchema } from '../utils/schemas.js';
 import { compactComment, fetchSubmissionStatus, submissionCommentArea, } from './assignments.js';
+import { fetchSiteInfo } from './site.js';
 import { defineTool, reqOpts } from './types.js';
-/** Форматы текста Moodle (FORMAT_HTML, FORMAT_MARKDOWN). */
-const FORMAT_HTML = 1;
-const FORMAT_MARKDOWN = 4;
 /** Плагин отзыва-комментария и имя его поля в plugindata. */
 const COMMENTS_EDITOR = 'assignfeedbackcomments_editor';
 /**
@@ -39,6 +39,37 @@ function requireSubmission(status, userId) {
     }
     return sub;
 }
+/**
+ * Загружает картинки в один черновик пользователя и возвращает его itemid.
+ * Перед записью сверяется с сайтом: разрешает ли сервис токена загрузку и
+ * не меньше ли предел пользователя, — чтобы отказ пришёл до первого файла.
+ */
+async function uploadImages(images, opts) {
+    const info = await fetchSiteInfo(opts);
+    if (info.uploadfiles === 0) {
+        throw new Error("The token's web service does not allow file uploads (uploadfiles = 0): images cannot be " +
+            'attached. Save the feedback without images.');
+    }
+    const limit = info.usermaxuploadfilesize;
+    const tooBig = images.find((i) => limit !== undefined && limit >= 0 && i.data.byteLength > limit);
+    if (tooBig) {
+        throw new Error(`Image "${tooBig.name}" exceeds the site upload limit of ${limit} bytes.`);
+    }
+    const client = getMoodleClient();
+    let itemid = 0;
+    for (const image of images) {
+        const stored = await client.uploadDraftFile({ name: image.name, mimeType: image.mimeType, data: image.data }, itemid, opts);
+        // Имя в тексте должно совпасть с сохранённым, иначе картинка битая.
+        if (stored.filename !== image.name) {
+            throw new Error(`Moodle stored image "${image.name}" as "${stored.filename}"; the grade was not saved.`);
+        }
+        if (itemid !== 0 && stored.itemid !== itemid) {
+            throw new Error('Moodle put images into different draft areas; the grade was not saved.');
+        }
+        itemid = stored.itemid;
+    }
+    return itemid;
+}
 export const gradingTools = {
     moodle_save_grade: defineTool({
         description: "Saves a participant's grade for an assignment and writes feedback comments. THE STUDENT " +
@@ -46,7 +77,11 @@ export const gradingTools = {
             'enabled) and may receive a notification. Call only after the teacher has explicitly ' +
             'confirmed the grade and the text. The grade is checked against the assignment maximum. ' +
             'Feedback is required: Moodle saves the grade and the feedback together, so the text ' +
-            'replaces the previous feedback.',
+            'replaces the previous feedback (and its images). images attaches local screenshots or ' +
+            'pictures INSIDE the feedback text — THE STUDENT WILL SEE THEM: put them in the text as ' +
+            '<img src="@@PLUGINFILE@@/<file name>"> (html) or ![](@@PLUGINFILE@@/<file name>) ' +
+            '(markdown); images not referenced are appended at the end. Show the teacher the images ' +
+            'before confirming.',
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
         inputSchema: z.object({
             assignmentId: assignmentIdSchema,
@@ -64,6 +99,18 @@ export const gradingTools = {
                 .enum(['plain', 'markdown', 'html'])
                 .default('plain')
                 .describe('feedback format: plain — plain text (paragraphs separated by a blank line), markdown, html'),
+            images: z
+                .array(z.object({
+                path: z
+                    .string()
+                    .min(1)
+                    .refine(isAbsolute, 'absolute path required')
+                    .describe('Absolute path to a local PNG/JPEG/GIF/WebP file; the file name (Latin letters, digits, . _ -) is the name in @@PLUGINFILE@@'),
+                alt: z.string().optional().describe('Alternative text of the image'),
+            }))
+                .max(MAX_FEEDBACK_IMAGES)
+                .optional()
+                .describe(`Images to show inside the feedback, up to ${MAX_FEEDBACK_IMAGES}, each up to ${MAX_FEEDBACK_IMAGE_BYTES / 1024 / 1024} MiB`),
             attemptNumber: z
                 .number()
                 .int()
@@ -86,6 +133,9 @@ export const gradingTools = {
         async execute(args, signal) {
             const opts = reqOpts(signal);
             const client = getMoodleClient();
+            // Картинки и ссылки на них проверяются локально, до любого запроса.
+            const images = await loadFeedbackImages(args.images ?? []);
+            const comment = composeFeedback(args.feedback, args.feedbackFormat, images);
             // Настройка оценки задания: максимум или шкала.
             const { cm } = await client.call(WS.moduleByInstance, { module: 'assign', instance: args.assignmentId }, opts);
             let gradeSetting = cm.grade;
@@ -102,26 +152,45 @@ export const gradingTools = {
             // Плагин отзывов при сохранении перезаписывает комментарий тем, что
             // пришло в plugindata, поэтому отзыв обязателен: пересылка прежнего
             // текста гоняла бы его через HTML из Moodle и ломала встроенные картинки.
-            let comment;
-            if (args.feedbackFormat === 'plain') {
-                comment = { text: plainToHtml(args.feedback), format: FORMAT_HTML };
+            if (images.length === 0) {
+                await client.call(WS.saveGrade, {
+                    assignmentid: args.assignmentId,
+                    userid: args.userId,
+                    grade: args.grade,
+                    attemptnumber: args.attemptNumber,
+                    addattempt: args.addAttempt,
+                    workflowstate: args.workflowState ?? '',
+                    applytoall: args.applyToAll,
+                    plugindata: { [COMMENTS_EDITOR]: comment },
+                }, { ...opts, mutation: true });
             }
             else {
-                comment = {
-                    text: args.feedback,
-                    format: args.feedbackFormat === 'markdown' ? FORMAT_MARKDOWN : FORMAT_HTML,
-                };
+                // mod_assign_save_grade принимает у редактора отзыва только text и
+                // format: itemid черновика он отвергает, и файлы к отзыву не попадут.
+                // Форма оценки (то же, что сохраняет панель оценивания) берёт
+                // редактор целиком и переносит файлы черновика в область отзыва.
+                // Ошибка загрузки обрывает вызов до записи оценки.
+                const itemid = await uploadImages(images, opts);
+                const form = new URLSearchParams(encodeParams({
+                    grade: args.grade,
+                    attemptnumber: args.attemptNumber,
+                    addattempt: args.addAttempt,
+                    workflowstate: args.workflowState,
+                    applytoall: args.applyToAll,
+                    // Как у mod_assign_save_grade: без поля Moodle уведомляет студента.
+                    sendstudentnotifications: true,
+                    [COMMENTS_EDITOR]: { ...comment, itemid },
+                })).toString();
+                const warnings = await client.call(WS.submitGradingForm, {
+                    assignmentid: args.assignmentId,
+                    userid: args.userId,
+                    jsonformdata: JSON.stringify(form),
+                }, { ...opts, mutation: true });
+                if (warnings.length > 0) {
+                    const detail = warnings.map((w) => w.message ?? w.warningcode).join('; ');
+                    throw new Error(`Moodle did not save the grade: ${detail}`);
+                }
             }
-            await client.call(WS.saveGrade, {
-                assignmentid: args.assignmentId,
-                userid: args.userId,
-                grade: args.grade,
-                attemptnumber: args.attemptNumber,
-                addattempt: args.addAttempt,
-                workflowstate: args.workflowState ?? '',
-                applytoall: args.applyToAll,
-                plugindata: { [COMMENTS_EDITOR]: comment },
-            }, { ...opts, mutation: true });
             // Читаем обратно: подтверждение — то, что Moodle теперь показывает, а
             // не то, что мы отправили.
             const after = await fetchSubmissionStatus(args.assignmentId, args.userId, opts);
@@ -136,6 +205,11 @@ export const gradingTools = {
                     : null,
                 gradedAt: isoTime(after.feedback?.gradeddate ?? after.feedback?.grade?.timemodified),
                 feedback: field ? htmlToText(field.text) || null : null,
+                // Картинка на месте, если в сохранённом тексте есть ссылка на её файл.
+                images: images.map((i) => ({
+                    name: i.name,
+                    inFeedback: field?.text.includes(`/${i.name}`) ?? false,
+                })),
             };
         },
     }),

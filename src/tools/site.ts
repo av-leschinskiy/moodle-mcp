@@ -19,6 +19,10 @@ interface SiteInfoResponse {
   username?: string;
   fullname?: string;
   functions?: { name: string }[];
+  /** 1 — сервис токена разрешает загрузку файлов (`webservice/upload.php`). */
+  uploadfiles?: number;
+  /** Предел размера загружаемого файла для пользователя, байты; -1 — без предела. */
+  usermaxuploadfilesize?: number;
 }
 
 interface UserCourse {
@@ -42,8 +46,9 @@ export const siteTools = {
     description:
       'Who I am on the Moodle site and what the site is: user name and id, site name and ' +
       'Moodle version, version of this MCP server. missingFunctions lists API functions the ' +
-      'token does not grant (tools that need them will fail). Start here if it is unclear ' +
-      'whether the connection works.',
+      'token does not grant (tools that need them will fail). uploadFiles tells whether the ' +
+      "token's service allows file uploads (needed for images in moodle_save_grade; null — " +
+      'the site did not say). Start here if it is unclear whether the connection works.',
     annotations: { readOnlyHint: true, idempotentHint: true },
     inputSchema: z.object({}),
     async execute(_args, signal) {
@@ -59,6 +64,11 @@ export const siteTools = {
         user: { id: info.userid, username: info.username ?? null, fullname: info.fullname ?? null },
         server: { package: PACKAGE_NAME, version: VERSION },
         missingFunctions: Object.values(WS).filter((name) => !available.has(name)),
+        uploadFiles: info.uploadfiles === undefined ? null : info.uploadfiles === 1,
+        maxUploadBytes:
+          info.usermaxuploadfilesize === undefined || info.usermaxuploadfilesize < 0
+            ? null
+            : info.usermaxuploadfilesize,
       };
     },
   }),

@@ -96,6 +96,24 @@ export declare class MoodleClient {
         url: URL;
         response: Response;
     }>;
+    /**
+     * Кладёт файл в черновую область пользователя токена
+     * (`webservice/upload.php`) и возвращает itemid черновика и имя, под которым
+     * Moodle сохранил файл. `itemid` 0 — новый черновик, иначе файл добавляется
+     * в уже созданный. Студент черновик не видит; к отзыву его привязывает
+     * последующая запись формы оценки.
+     *
+     * Токен уходит полем тела, не в URL. Повтора нет: второй раз тот же файл
+     * в тот же черновик Moodle не примет (`filenameexist`).
+     */
+    uploadDraftFile(file: {
+        name: string;
+        mimeType: string;
+        data: Uint8Array<ArrayBuffer>;
+    }, itemid: number, options?: CallOptions): Promise<{
+        itemid: number;
+        filename: string;
+    }>;
     private loadToken;
     private describe;
     private toError;

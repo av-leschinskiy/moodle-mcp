@@ -9,7 +9,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as moodleClient from '../api/moodle-client.js';
 import { resetConfig } from '../config.js';
-import { FAKE_SITE, FAKE_TOKEN, fakeClient, stubMoodle } from '../testing/fake-moodle.js';
+import { FAKE_SITE, FAKE_TOKEN, fakeClient, stubMoodle, UPLOAD } from '../testing/fake-moodle.js';
+import { composeFeedback, MAX_FEEDBACK_IMAGE_BYTES } from '../utils/feedback-images.js';
 import { assignmentsTools } from './assignments.js';
 import { filesTools, safeFileName } from './files.js';
 import { gradingTools, validateGrade } from './grading.js';
@@ -47,6 +48,19 @@ describe('moodle_site_info', () => {
     expect(result.site.release).toContain('4.5');
     expect(result.missingFunctions).toContain('mod_assign_save_grade');
     expect(result.missingFunctions).not.toContain('mod_assign_get_assignments');
+    expect(result.uploadFiles).toBeNull();
+  });
+
+  it('говорит, разрешает ли сервис токена загрузку файлов', async () => {
+    stubMoodle({
+      core_webservice_get_site_info: () => ({
+        ...SITE_INFO,
+        uploadfiles: 1,
+        usermaxuploadfilesize: 1024,
+      }),
+    });
+    const result = await siteTools.moodle_site_info.execute({});
+    expect(result).toMatchObject({ uploadFiles: true, maxUploadBytes: 1024 });
   });
 });
 
@@ -367,8 +381,20 @@ describe('moodle_get_submission', () => {
       core_comment_get_comments: (p) => ({
         comments: [
           p.page === '0'
-            ? { id: 1, content: '<p>Вопрос</p>', timecreated: 1_700_000_100, userid: 101, fullname: 'Студент А' }
-            : { id: 2, content: '<p>Ответ</p>', timecreated: 1_700_000_200, userid: 2, fullname: 'Тест Преподаватель' },
+            ? {
+                id: 1,
+                content: '<p>Вопрос</p>',
+                timecreated: 1_700_000_100,
+                userid: 101,
+                fullname: 'Студент А',
+              }
+            : {
+                id: 2,
+                content: '<p>Ответ</p>',
+                timecreated: 1_700_000_200,
+                userid: 2,
+                fullname: 'Тест Преподаватель',
+              },
         ],
         count: 2,
         perpage: 1,
@@ -436,7 +462,14 @@ describe('moodle_get_submission', () => {
     stubMoodle({
       mod_assign_get_submission_status: () => ({
         lastattempt: {
-          submission: { id: 3, userid: 101, attemptnumber: 0, timecreated: 1, timemodified: 1, status: 'submitted' },
+          submission: {
+            id: 3,
+            userid: 101,
+            attemptnumber: 0,
+            timecreated: 1,
+            timemodified: 1,
+            status: 'submitted',
+          },
         },
       }),
       mod_assign_get_participant: () => ({ id: 101, fullname: 'Студент А' }),
@@ -577,10 +610,287 @@ describe('moodle_save_grade', () => {
   });
 });
 
+describe('moodle_save_grade с картинками', () => {
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 5, 6, 7]);
+  const DRAFT = 424242;
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'moodle-mcp-img-'));
+    await writeFile(join(dir, 'shot-1.png'), PNG);
+    await writeFile(join(dir, 'shot-2.jpg'), JPEG);
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const base = {
+    assignmentId: 5,
+    userId: 101,
+    grade: 80,
+    attemptNumber: -1,
+    addAttempt: false,
+    applyToAll: true,
+  };
+
+  /** Загрузка отвечает как upload.php: запись файла с itemid черновика. */
+  function storeUpload(_p: Record<string, string>, call: { file?: { name: string } }) {
+    return [
+      {
+        component: 'user',
+        filearea: 'draft',
+        itemid: DRAFT,
+        filename: call.file?.name,
+        filepath: '/',
+      },
+    ];
+  }
+
+  function stubImages(
+    extra: Record<string, (p: Record<string, string>, c: never) => unknown> = {},
+  ) {
+    return stubMoodle({
+      core_course_get_course_module_by_instance: () => ({ cm: { id: 77, course: 10, grade: 100 } }),
+      core_webservice_get_site_info: () => ({
+        ...SITE_INFO,
+        uploadfiles: 1,
+        usermaxuploadfilesize: -1,
+      }),
+      [UPLOAD]: storeUpload,
+      mod_assign_submit_grading_form: () => [],
+      mod_assign_get_submission_status: () => ({
+        feedback: {
+          grade: { grade: '80.00000', timemodified: 1_700_000_000 },
+          plugins: [
+            {
+              type: 'comments',
+              editorfields: [
+                {
+                  name: 'comments',
+                  format: 1,
+                  text: `<p>Смотри</p><img src="${FAKE_SITE}/webservice/pluginfile.php/9/assignfeedback_comments/feedback/3/shot-1.png"><p><img src="${FAKE_SITE}/webservice/pluginfile.php/9/assignfeedback_comments/feedback/3/shot-2.jpg"></p>`,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      ...extra,
+    });
+  }
+
+  function formData(calls: { wsfunction: string; params: Record<string, string> }[]) {
+    const submit = calls.find((c) => c.wsfunction === 'mod_assign_submit_grading_form');
+    expect(submit).toBeDefined();
+    expect(submit!.params.assignmentid).toBe('5');
+    expect(submit!.params.userid).toBe('101');
+    return new URLSearchParams(JSON.parse(submit!.params.jsonformdata!) as string);
+  }
+
+  it('грузит картинки в один черновик и шлёт его itemid в форме оценки', async () => {
+    const calls = stubImages();
+
+    const result = await gradingTools.moodle_save_grade.execute({
+      ...base,
+      feedback: '<p>Смотри</p><img src="@@PLUGINFILE@@/shot-1.png">',
+      feedbackFormat: 'html',
+      images: [
+        { path: join(dir, 'shot-1.png') },
+        { path: join(dir, 'shot-2.jpg'), alt: 'Форма "до"' },
+      ],
+    });
+
+    const uploads = calls.filter((c) => c.wsfunction === UPLOAD);
+    expect(uploads).toHaveLength(2);
+    for (const u of uploads) {
+      expect(u.url).toBe(`${FAKE_SITE}/webservice/upload.php`);
+      expect(u.url).not.toContain(FAKE_TOKEN);
+      expect(u.tokenInBody).toBe(true);
+      expect(u.params).toMatchObject({ filearea: 'draft', filepath: '/' });
+    }
+    // Первый файл открывает черновик, второй ложится в тот же.
+    expect(uploads.map((u) => u.params.itemid)).toEqual(['0', String(DRAFT)]);
+    expect(uploads.map((u) => [u.file?.name, u.file?.type])).toEqual([
+      ['shot-1.png', 'image/png'],
+      ['shot-2.jpg', 'image/jpeg'],
+    ]);
+    expect(Array.from(uploads[0]!.file!.bytes)).toEqual(Array.from(PNG));
+
+    const form = formData(calls);
+    expect(form.get('assignfeedbackcomments_editor[itemid]')).toBe(String(DRAFT));
+    expect(form.get('assignfeedbackcomments_editor[format]')).toBe('1');
+    expect(form.get('assignfeedbackcomments_editor[text]')).toBe(
+      '<p>Смотри</p><img src="@@PLUGINFILE@@/shot-1.png">' +
+        '<p><img src="@@PLUGINFILE@@/shot-2.jpg" alt="Форма &quot;до&quot;"></p>',
+    );
+    expect(Object.fromEntries(form)).toMatchObject({
+      grade: '80',
+      attemptnumber: '-1',
+      addattempt: '0',
+      applytoall: '1',
+      sendstudentnotifications: '1',
+    });
+    // Имена в @@PLUGINFILE@@ — ровно имена загруженных файлов.
+    const referenced = [
+      ...form.get('assignfeedbackcomments_editor[text]')!.matchAll(/@@PLUGINFILE@@\/([^"]+)/g),
+    ].map((m) => m[1]);
+    expect(referenced).toEqual(uploads.map((u) => u.file?.name));
+
+    expect(calls.some((c) => c.wsfunction === 'mod_assign_save_grade')).toBe(false);
+    // Загрузка — после проверки оценки, запись — после загрузки.
+    const order = calls.map((c) => c.wsfunction);
+    expect(order.indexOf('mod_assign_submit_grading_form')).toBeGreaterThan(
+      order.lastIndexOf(UPLOAD),
+    );
+    expect(result.images).toEqual([
+      { name: 'shot-1.png', inFeedback: true },
+      { name: 'shot-2.jpg', inFeedback: true },
+    ]);
+  });
+
+  it('ошибка загрузки: оценка не сохраняется, токен не попадает в текст ошибки', async () => {
+    const calls = stubImages({
+      [UPLOAD]: () => ({
+        error: `Upload failed for token ${FAKE_TOKEN}`,
+        errorcode: 'upload_error_ini_size',
+      }),
+    });
+
+    const err = await gradingTools.moodle_save_grade
+      .execute({
+        ...base,
+        feedback: 'См. снимок',
+        feedbackFormat: 'plain',
+        images: [{ path: join(dir, 'shot-1.png') }],
+      })
+      .then(
+        () => null,
+        (e: unknown) => e as Error,
+      );
+
+    expect(err).toBeInstanceOf(moodleClient.MoodleRequestError);
+    expect(err?.message).toContain('upload_error_ini_size');
+    expect(err?.message).not.toContain(FAKE_TOKEN);
+    expect(calls.some((c) => c.wsfunction === 'mod_assign_submit_grading_form')).toBe(false);
+    expect(calls.some((c) => c.wsfunction === 'mod_assign_save_grade')).toBe(false);
+  });
+
+  it('отказ по файлу и переименование файла сайтом — оценка не сохраняется', async () => {
+    for (const reply of [
+      () => [{ filename: 'shot-1.png', errortype: 'fileoversized', error: 'File too big' }],
+      () => [{ filename: 'shot_1.png', itemid: DRAFT, filearea: 'draft' }],
+    ]) {
+      const calls = stubImages({ [UPLOAD]: reply });
+      await expect(
+        gradingTools.moodle_save_grade.execute({
+          ...base,
+          feedback: 'x',
+          feedbackFormat: 'plain',
+          images: [{ path: join(dir, 'shot-1.png') }],
+        }),
+      ).rejects.toThrow(/fileoversized|stored image/);
+      expect(calls.some((c) => c.wsfunction === 'mod_assign_submit_grading_form')).toBe(false);
+    }
+  });
+
+  it('сервис без загрузки файлов: отказ до первого файла', async () => {
+    const calls = stubImages({
+      core_webservice_get_site_info: () => ({ ...SITE_INFO, uploadfiles: 0 }),
+    });
+    await expect(
+      gradingTools.moodle_save_grade.execute({
+        ...base,
+        feedback: 'x',
+        feedbackFormat: 'plain',
+        images: [{ path: join(dir, 'shot-1.png') }],
+      }),
+    ).rejects.toThrow(/does not allow file uploads/);
+    expect(calls.some((c) => c.wsfunction === UPLOAD)).toBe(false);
+  });
+
+  it('предупреждение формы оценки — ошибка тула', async () => {
+    stubImages({
+      mod_assign_submit_grading_form: () => [
+        { warningcode: 'couldnotsavegrade', message: 'Form validation failed.' },
+      ],
+    });
+    await expect(
+      gradingTools.moodle_save_grade.execute({
+        ...base,
+        feedback: 'x',
+        feedbackFormat: 'plain',
+        images: [{ path: join(dir, 'shot-1.png') }],
+      }),
+    ).rejects.toThrow(/Form validation failed/);
+  });
+
+  it('локальные проверки — до любого запроса в Moodle', async () => {
+    await writeFile(join(dir, 'fake.png'), 'not a png');
+    await writeFile(join(dir, 'big.png'), new Uint8Array(MAX_FEEDBACK_IMAGE_BYTES + 1));
+    await writeFile(join(dir, 'снимок.png'), PNG);
+    await writeFile(join(dir, 'notes.txt'), 'text');
+    const cases: [Record<string, unknown>, RegExp][] = [
+      [{ images: [{ path: join(dir, 'fake.png') }] }, /does not match/],
+      [{ images: [{ path: join(dir, 'big.png') }] }, /allowed 1…/],
+      [{ images: [{ path: join(dir, 'снимок.png') }] }, /not allowed/],
+      [{ images: [{ path: join(dir, 'notes.txt') }] }, /not a PNG/],
+      [{ images: [{ path: join(dir, 'missing.png') }] }, /not a readable file/],
+      [
+        { images: [{ path: join(dir, 'shot-1.png') }, { path: join(dir, 'shot-1.png') }] },
+        /unique/,
+      ],
+      [{ feedbackFormat: 'html', feedback: '<img src="@@PLUGINFILE@@/other.png">' }, /no image/],
+    ];
+    for (const [extra, error] of cases) {
+      const calls = stubImages();
+      await expect(
+        gradingTools.moodle_save_grade.execute({
+          ...base,
+          feedback: 'x',
+          feedbackFormat: 'plain',
+          ...extra,
+        } as Parameters<typeof gradingTools.moodle_save_grade.execute>[0]),
+      ).rejects.toThrow(error);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('схема: только абсолютные пути и не больше пяти картинок', () => {
+    const schema = gradingTools.moodle_save_grade.inputSchema;
+    const ok = { assignmentId: 5, userId: 101, grade: 50, feedback: 'x' };
+    expect(schema.safeParse({ ...ok, images: [{ path: 'shot.png' }] }).success).toBe(false);
+    const six = Array.from({ length: 6 }, (_, i) => ({ path: `/tmp/s${i}.png` }));
+    expect(schema.safeParse({ ...ok, images: six }).success).toBe(false);
+  });
+
+  it('composeFeedback: markdown дописывает картинку, plain — всегда в конец', () => {
+    const img = [{ name: 'a.png', alt: 'x [1]' }];
+    expect(composeFeedback('Текст', 'markdown', img)).toEqual({
+      text: 'Текст\n\n![x 1](@@PLUGINFILE@@/a.png)',
+      format: 4,
+    });
+    expect(composeFeedback('![](@@PLUGINFILE@@/a.png)', 'markdown', img).text).toBe(
+      '![](@@PLUGINFILE@@/a.png)',
+    );
+    expect(composeFeedback('a\n\nb', 'plain', img).text).toBe(
+      '<p>a</p><p>b</p><p><img src="@@PLUGINFILE@@/a.png" alt="x [1]"></p>',
+    );
+  });
+});
+
 function submissionStatus(status: string) {
   return () => ({
     lastattempt: {
-      submission: { id: 9, userid: 101, attemptnumber: 0, timecreated: 1, timemodified: 1_700_000_000, status },
+      submission: {
+        id: 9,
+        userid: 101,
+        attemptnumber: 0,
+        timecreated: 1,
+        timemodified: 1_700_000_000,
+        status,
+      },
     },
   });
 }
@@ -591,7 +901,13 @@ describe('moodle_add_submission_comment', () => {
       mod_assign_get_submission_status: submissionStatus('submitted'),
       core_course_get_course_module_by_instance: () => ({ cm: { id: 77, course: 10 } }),
       core_comment_add_comments: () => [
-        { id: 5, content: '<p>Поправьте тесты</p>', timecreated: 1_700_000_300, userid: 2, fullname: 'Тест Преподаватель' },
+        {
+          id: 5,
+          content: '<p>Поправьте тесты</p>',
+          timecreated: 1_700_000_300,
+          userid: 2,
+          fullname: 'Тест Преподаватель',
+        },
       ],
     });
 
@@ -619,7 +935,11 @@ describe('moodle_add_submission_comment', () => {
     });
 
     await expect(
-      gradingTools.moodle_add_submission_comment.execute({ assignmentId: 5, userId: 101, text: 'x' }),
+      gradingTools.moodle_add_submission_comment.execute({
+        assignmentId: 5,
+        userId: 101,
+        text: 'x',
+      }),
     ).rejects.toThrow(/no submission/);
     expect(calls.some((c) => c.wsfunction === 'core_comment_add_comments')).toBe(false);
   });
@@ -652,7 +972,9 @@ describe('moodle_revert_submission_to_draft', () => {
     await expect(
       gradingTools.moodle_revert_submission_to_draft.execute({ assignmentId: 5, userId: 101 }),
     ).rejects.toThrow(/not submitted/);
-    expect(calls.some((c) => c.wsfunction === 'mod_assign_revert_submissions_to_draft')).toBe(false);
+    expect(calls.some((c) => c.wsfunction === 'mod_assign_revert_submissions_to_draft')).toBe(
+      false,
+    );
   });
 
   it('предупреждение Moodle — ошибка', async () => {
