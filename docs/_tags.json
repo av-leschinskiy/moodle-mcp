@@ -4,5 +4,6 @@
   "docs": "Документация и её правила",
   "grading": "Оценка, отзыв и другие записи, которые видит студент",
   "moodle-api": "Контракт и поведение веб-сервисов Moodle",
-  "release": "Выпуск версий: npm, MCP Registry, workflow Release"
+  "release": "Выпуск версий: npm, MCP Registry, workflow Release",
+  "submissions": "Сдачи студентов: чтение и состояние разбора"
 }

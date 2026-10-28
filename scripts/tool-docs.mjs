@@ -27,7 +27,7 @@ const END = '<!-- END:tools-table -->';
  */
 const CATEGORIES = [
   ['siteTools', 'Site', 'who I am, Moodle version, available functions, my courses'],
-  ['assignmentsTools', 'Assignments and submissions', 'course assignments, participants and submission statuses, full submission'],
+  ['assignmentsTools', 'Assignments and submissions', 'course assignments, participants and submission statuses, what needs the teacher across a course, full submission'],
   ['filesTools', 'Files', 'downloading submission files to disk'],
   ['gradingTools', 'Grading', 'grade and feedback, submission comment, returning a submission for rework'],
 ];

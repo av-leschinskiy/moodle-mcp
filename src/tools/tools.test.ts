@@ -198,8 +198,10 @@ describe('moodle_list_assignments', () => {
 });
 
 describe('moodle_list_submissions', () => {
-  function stubSubmissions() {
+  function stubSubmissions(extra: Parameters<typeof stubMoodle>[0] = {}) {
     return stubMoodle({
+      core_course_get_course_module_by_instance: () => ({ cm: { id: 77, course: 10 } }),
+      core_comment_get_comments: () => ({ comments: [], count: 0 }),
       mod_assign_list_participants: () => [
         {
           id: 101,
@@ -270,6 +272,7 @@ describe('moodle_list_submissions', () => {
           },
         ],
       }),
+      ...extra,
     });
   }
 
@@ -284,7 +287,13 @@ describe('moodle_list_submissions', () => {
     expect(
       calls.find((c) => c.wsfunction === 'mod_assign_list_participants')?.params,
     ).toMatchObject({ assignid: '5' });
-    expect(result.counts).toEqual({ participants: 3, submitted: 2, needsGrading: 1, graded: 1 });
+    expect(result.counts).toEqual({
+      participants: 3,
+      submitted: 2,
+      needsGrading: 1,
+      graded: 1,
+      needsAttention: 1,
+    });
     expect(result.items).toHaveLength(3);
     expect(result.items[0]).toMatchObject({
       userId: 101,
@@ -318,6 +327,216 @@ describe('moodle_list_submissions', () => {
     expect(needs.items.map((i) => i.userId)).toEqual([101]);
     expect(needs.counts.participants).toBe(3);
     expect(notSubmitted.items.map((i) => i.userId)).toEqual([103]);
+  });
+
+  it('состояние разбора: комментарии только у сданных, автор-преподаватель — не сам студент', async () => {
+    const calls = stubSubmissions({
+      // Сдача 2 (участник 102) оценена раньше, чем изменена, и разобрана
+      // комментарием преподавателя; у сдачи 1 только вопрос самого студента.
+      mod_assign_get_grades: () => ({
+        assignments: [
+          {
+            assignmentid: 5,
+            grades: [
+              {
+                userid: 102,
+                attemptnumber: 0,
+                timemodified: 1_700_000_050,
+                grader: 2,
+                grade: '90',
+              },
+            ],
+          },
+        ],
+      }),
+      core_comment_get_comments: (p) => ({
+        comments:
+          p.itemid === '2'
+            ? [{ id: 9, content: 'ок', timecreated: 1_700_000_300, userid: 2, fullname: 'Тест' }]
+            : [{ id: 8, content: '?', timecreated: 1_699_999_000, userid: 101, fullname: 'А' }],
+        count: 1,
+      }),
+    });
+
+    const result = await assignmentsTools.moodle_list_submissions.execute({
+      assignmentId: 5,
+      status: 'all',
+    });
+
+    const commentCalls = calls.filter((c) => c.wsfunction === 'core_comment_get_comments');
+    expect(commentCalls.map((c) => c.params.itemid).sort()).toEqual(['1', '2']);
+    expect(
+      calls.filter((c) => c.wsfunction === 'core_course_get_course_module_by_instance'),
+    ).toHaveLength(1);
+    expect(result.items.map((i) => [i.userId, i.review])).toEqual([
+      [101, 'new_submission'],
+      [102, 'update_reviewed'],
+      [103, 'not_submitted'],
+    ]);
+    expect(result.items[0]).toMatchObject({
+      teacherCommentAt: null,
+      studentCommentAt: '2023-11-14T21:56:40.000Z',
+    });
+    expect(result.items[1]?.teacherCommentAt).toBe('2023-11-14T22:18:20.000Z');
+
+    const attention = await assignmentsTools.moodle_list_submissions.execute({
+      assignmentId: 5,
+      status: 'needs_attention',
+    });
+    expect(attention.items.map((i) => i.userId)).toEqual([101]);
+  });
+
+  it('комментарии недоступны — состояние по временам, строка помечена', async () => {
+    stubSubmissions({
+      core_comment_get_comments: () => ({
+        exception: 'moodle_exception',
+        errorcode: 'nopermissions',
+        message: 'no',
+      }),
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await assignmentsTools.moodle_list_submissions.execute({
+      assignmentId: 5,
+      status: 'all',
+    });
+
+    expect(result.items[0]).toMatchObject({ review: 'new_submission', commentsUnavailable: true });
+    expect(result.items[2]).not.toHaveProperty('commentsUnavailable');
+  });
+});
+
+describe('moodle_list_pending_submissions', () => {
+  const assignment = (id: number, cmid: number, name: string) => ({
+    id,
+    cmid,
+    course: 10,
+    name,
+    duedate: 0,
+    allowsubmissionsfromdate: 0,
+    cutoffdate: 0,
+    gradingduedate: 0,
+    grade: 100,
+    teamsubmission: 0,
+    blindmarking: 0,
+    markingworkflow: 0,
+    maxattempts: -1,
+    configs: [],
+  });
+  const participant = (id: number) => ({
+    id,
+    fullname: `Студент ${id}`,
+    submitted: true,
+    requiregrading: false,
+    grantedextension: false,
+  });
+  const submission = (id: number, userid: number, status: string, timemodified: number) => ({
+    id,
+    userid,
+    attemptnumber: 0,
+    timecreated: 1,
+    timemodified,
+    status,
+  });
+
+  function stubCourse() {
+    return stubMoodle({
+      mod_assign_get_assignments: () => ({
+        courses: [
+          { id: 10, assignments: [assignment(5, 77, 'Первое'), assignment(6, 78, 'Второе')] },
+        ],
+      }),
+      mod_assign_list_participants: () => [participant(101), participant(102)],
+      mod_assign_get_submissions: (p) => ({
+        assignments: [
+          p['assignmentids[0]'] === '5'
+            ? {
+                assignmentid: 5,
+                submissions: [
+                  submission(1, 101, 'submitted', 1_700_000_100),
+                  submission(2, 102, 'submitted', 1_700_000_100),
+                ],
+              }
+            : { assignmentid: 6, submissions: [submission(3, 101, 'draft', 1_700_000_100)] },
+        ],
+      }),
+      mod_assign_get_grades: (p) => ({
+        assignments: [
+          {
+            assignmentid: Number(p['assignmentids[0]']),
+            grades:
+              p['assignmentids[0]'] === '5'
+                ? [
+                    {
+                      userid: 102,
+                      attemptnumber: 0,
+                      timemodified: 1_700_000_200,
+                      grader: 2,
+                      grade: '100',
+                    },
+                  ]
+                : [
+                    {
+                      userid: 101,
+                      attemptnumber: 0,
+                      timemodified: 1_700_000_200,
+                      grader: 2,
+                      grade: '-1',
+                    },
+                  ],
+          },
+        ],
+      }),
+      core_comment_get_comments: () => ({ comments: [], count: 0 }),
+    });
+  }
+
+  it('по всем заданиям курса — только требующие действия, cmid из списка заданий', async () => {
+    const calls = stubCourse();
+
+    const result = await assignmentsTools.moodle_list_pending_submissions.execute({
+      courseId: 10,
+      status: 'needs_attention',
+    });
+
+    expect(result).toMatchObject({
+      courseId: 10,
+      assignments: 2,
+      filter: 'needs_attention',
+      counts: { new_submission: 1 },
+    });
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        assignmentId: 5,
+        assignment: 'Первое',
+        userId: 101,
+        review: 'new_submission',
+        modifiedAt: '2023-11-14T22:15:00.000Z',
+      }),
+    ]);
+    expect(
+      calls.filter((c) => c.wsfunction === 'core_course_get_course_module_by_instance'),
+    ).toHaveLength(0);
+    expect(
+      calls
+        .filter((c) => c.wsfunction === 'core_comment_get_comments')
+        .map((c) => c.params.instanceid),
+    ).toEqual(['77', '77', '78']);
+  });
+
+  it('open добавляет работы на доработке', async () => {
+    stubCourse();
+
+    const result = await assignmentsTools.moodle_list_pending_submissions.execute({
+      courseId: 10,
+      status: 'open',
+    });
+
+    expect(result.items.map((i) => [i.assignmentId, i.userId, i.review])).toEqual([
+      [5, 101, 'new_submission'],
+      [6, 101, 'rework'],
+    ]);
+    expect(result.counts).toEqual({ new_submission: 1, rework: 1 });
   });
 });
 

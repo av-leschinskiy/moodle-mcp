@@ -51,13 +51,13 @@ export declare const allTools: {
     }>;
     readonly moodle_list_submissions: import("./types.js").ToolDef<import("zod").ZodObject<{
         assignmentId: import("zod").ZodNumber;
-        status: import("zod").ZodDefault<import("zod").ZodEnum<["all", "submitted", "needs_grading", "graded", "not_submitted", "draft"]>>;
+        status: import("zod").ZodDefault<import("zod").ZodEnum<["all", "submitted", "needs_grading", "graded", "not_submitted", "draft", "needs_attention", "open"]>>;
     }, "strip", import("zod").ZodTypeAny, {
         assignmentId: number;
-        status: "all" | "draft" | "graded" | "needs_grading" | "not_submitted" | "submitted";
+        status: "all" | "draft" | "graded" | "needs_attention" | "needs_grading" | "not_submitted" | "open" | "submitted";
     }, {
         assignmentId: number;
-        status?: "all" | "draft" | "graded" | "needs_grading" | "not_submitted" | "submitted" | undefined;
+        status?: "all" | "draft" | "graded" | "needs_attention" | "needs_grading" | "not_submitted" | "open" | "submitted" | undefined;
     }>, import("zod").ZodTypeAny, {
         assignmentId: number;
         counts: {
@@ -65,12 +65,14 @@ export declare const allTools: {
             submitted: number;
             needsGrading: number;
             graded: number;
+            needsAttention: number;
         };
-        filter: "all" | "draft" | "graded" | "needs_grading" | "not_submitted" | "submitted";
+        filter: "all" | "draft" | "graded" | "needs_attention" | "needs_grading" | "not_submitted" | "open" | "submitted";
         items: {
             userId: number;
             fullname: string;
             status: string;
+            review: "awaiting_student" | "graded" | "new_submission" | "not_submitted" | "resubmitted" | "rework" | "student_comment" | "update_reviewed" | "update_unreviewed";
             submittedAt: string | null;
             modifiedAt: string | null;
             attempt: number;
@@ -78,8 +80,42 @@ export declare const allTools: {
             gradingStatus: string | null;
             grade: number | null;
             gradedAt: string | null;
+            teacherCommentAt: string | null;
+            studentCommentAt: string | null;
             extension: boolean;
             suspended?: boolean;
+            commentsUnavailable?: boolean;
+        }[];
+    }>;
+    readonly moodle_list_pending_submissions: import("./types.js").ToolDef<import("zod").ZodObject<{
+        courseId: import("zod").ZodNumber;
+        status: import("zod").ZodDefault<import("zod").ZodEnum<["needs_attention", "open"]>>;
+    }, "strip", import("zod").ZodTypeAny, {
+        courseId: number;
+        status: "needs_attention" | "open";
+    }, {
+        courseId: number;
+        status?: "needs_attention" | "open" | undefined;
+    }>, import("zod").ZodTypeAny, {
+        courseId: number;
+        assignments: number;
+        filter: "needs_attention" | "open";
+        counts: Partial<Record<"awaiting_student" | "graded" | "new_submission" | "not_submitted" | "resubmitted" | "rework" | "student_comment" | "update_reviewed" | "update_unreviewed", number>>;
+        items: {
+            assignmentId: number;
+            assignment: string;
+            userId: number;
+            fullname: string;
+            review: "awaiting_student" | "graded" | "new_submission" | "not_submitted" | "resubmitted" | "rework" | "student_comment" | "update_reviewed" | "update_unreviewed";
+            status: string;
+            attempt: number;
+            modifiedAt: string | null;
+            grade: number | null;
+            gradedAt: string | null;
+            teacherCommentAt: string | null;
+            studentCommentAt: string | null;
+            suspended?: boolean;
+            commentsUnavailable?: boolean;
         }[];
     }>;
     readonly moodle_get_submission: import("./types.js").ToolDef<import("zod").ZodObject<{

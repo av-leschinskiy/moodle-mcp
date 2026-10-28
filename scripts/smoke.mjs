@@ -4,9 +4,10 @@
 //   MOODLE_URL=https://moodle.example.org npm run smoke
 //
 // site_info → list_courses → list_assignments (первый курс с заданиями) →
-// list_submissions → get_submission (первая сдача). Печатает только факт
-// успеха и количества — ни имён, ни текстов: в ответах личные данные
-// студентов, а вывод смоука оседает в логах и терминалах.
+// list_submissions → list_pending_submissions (тот же курс) → get_submission
+// (первая сдача). Печатает только факт успеха и количества — ни имён, ни
+// текстов: в ответах личные данные студентов, а вывод смоука оседает в логах
+// и терминалах.
 //
 // Тул вызывается, только если у него `readOnlyHint` в annotations: станет
 // тул пишущим — смоук откажется его звать, а не поставит оценку.
@@ -38,11 +39,13 @@ try {
   ok('moodle_list_courses', `курсов: ${courses.items.length}`);
 
   let assignment;
+  let courseId;
   for (const course of courses.items) {
     const list = await run('moodle_list_assignments', { courseId: course.id });
     if (list.items.length > 0) {
       ok('moodle_list_assignments', `заданий в курсе: ${list.items.length}`);
       assignment = list.items[0];
+      courseId = course.id;
       break;
     }
   }
@@ -55,7 +58,14 @@ try {
   ok(
     'moodle_list_submissions',
     `участников: ${subs.counts.participants}, сдали: ${subs.counts.submitted}, ` +
-      `ждут оценки: ${subs.counts.needsGrading}, оценено: ${subs.counts.graded}`,
+      `ждут оценки: ${subs.counts.needsGrading}, оценено: ${subs.counts.graded}, ` +
+      `требуют внимания: ${subs.counts.needsAttention}`,
+  );
+
+  const pending = await run('moodle_list_pending_submissions', { courseId, status: 'open' });
+  ok(
+    'moodle_list_pending_submissions',
+    `заданий: ${pending.assignments}, незакрытых сдач по состояниям: ${JSON.stringify(pending.counts)}`,
   );
 
   const first = subs.items.find((s) => s.status === 'submitted');
