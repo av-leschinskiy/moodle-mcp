@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { WS } from '../api/functions.js';
-import { getMoodleClient } from '../api/moodle-client.js';
+import { getMoodleClient, MoodleRequestError } from '../api/moodle-client.js';
 import type { CallOptions } from '../api/moodle-client.js';
 import { describeGradeType, htmlToText, isoTime, parseGrade } from '../utils/format.js';
 import { log } from '../utils/logger.js';
@@ -211,6 +211,38 @@ export function fetchSubmissionStatus(
     { assignid: assignmentId, userid: userId },
     options,
   );
+}
+
+/**
+ * Имя участника задания. mod_assign_get_participant учитывает фильтр и настройки
+ * таблицы оценивания, которые преподаватель выставил в браузере (тот же
+ * пользователь, что у токена): отфильтрованный участник даёт `userisfilteredout`.
+ * mod_assign_list_participants этих настроек не читает — из него имя и берётся.
+ */
+async function participantName(
+  assignmentId: number,
+  userId: number,
+  options?: CallOptions,
+): Promise<string> {
+  const client = getMoodleClient();
+  try {
+    const p = await client.call<ParticipantResponse>(
+      WS.participant,
+      { assignid: assignmentId, userid: userId },
+      options,
+    );
+    return p.fullname;
+  } catch (err) {
+    if (!(err instanceof MoodleRequestError) || err.errorcode !== 'userisfilteredout') throw err;
+    const all = await client.call<Participant[]>(
+      WS.listParticipants,
+      { assignid: assignmentId, groupid: 0, filter: '' },
+      options,
+    );
+    const p = all.find((x) => x.id === userId);
+    if (!p) throw err;
+    return p.fullname;
+  }
 }
 
 /** Модуль курса (cmid) задания: в его контексте живут комментарии к сдачам. */
@@ -659,14 +691,9 @@ export const assignmentsTools = {
     inputSchema: z.object({ assignmentId: assignmentIdSchema, userId: userIdSchema }),
     async execute(args, signal) {
       const opts = reqOpts(signal);
-      const client = getMoodleClient();
-      const [status, participant] = await Promise.all([
+      const [status, fullname] = await Promise.all([
         fetchSubmissionStatus(args.assignmentId, args.userId, opts),
-        client.call<ParticipantResponse>(
-          WS.participant,
-          { assignid: args.assignmentId, userid: args.userId },
-          opts,
-        ),
+        participantName(args.assignmentId, args.userId, opts),
       ]);
 
       const last = status.lastattempt;
@@ -693,7 +720,7 @@ export const assignmentsTools = {
       return {
         assignmentId: args.assignmentId,
         userId: args.userId,
-        fullname: participant.fullname,
+        fullname,
         status: sub?.status ?? 'new',
         attempt: sub?.attemptnumber ?? 0,
         previousAttempts: status.previousattempts?.length ?? 0,

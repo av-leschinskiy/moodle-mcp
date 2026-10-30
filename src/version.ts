@@ -7,8 +7,8 @@
  * Точная идентификация выпуска — VERSION. Суффикс `-dirty` означает, что при
  * сборке были незакоммиченные правки, то есть dist мог разойтись с коммитом.
  */
-export const VERSION = "0.2.0";
-export const BASE_COMMIT = "422afceb12c3d80ad67cfb511741f6e6577c7734";
-export const BASE_COMMIT_SHORT = "422afce";
-export const BUILD_DATE = "2026-10-28";
+export const VERSION = "0.2.1";
+export const BASE_COMMIT = "2a9df4e2c0e86f5b282a305eee17a46b148bcd60";
+export const BASE_COMMIT_SHORT = "2a9df4e";
+export const BUILD_DATE = "2026-10-30";
 export const PACKAGE_NAME = "@av-leschinskiy/moodle-mcp";

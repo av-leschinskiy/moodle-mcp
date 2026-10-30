@@ -677,6 +677,43 @@ describe('moodle_get_submission', () => {
     });
   });
 
+  it('участник скрыт фильтром таблицы оценивания — имя из списка участников', async () => {
+    stubMoodle({
+      mod_assign_get_submission_status: () => ({ lastattempt: { gradingstatus: 'graded' } }),
+      mod_assign_get_participant: () => ({
+        exception: 'moodle_exception',
+        errorcode: 'userisfilteredout',
+        message: 'This user does not match filters and table preferences!',
+      }),
+      mod_assign_list_participants: () => [
+        { id: 101, fullname: 'Студент А' },
+        { id: 102, fullname: 'Студент Б' },
+      ],
+    });
+
+    const result = await assignmentsTools.moodle_get_submission.execute({
+      assignmentId: 5,
+      userId: 102,
+    });
+
+    expect(result).toMatchObject({ userId: 102, fullname: 'Студент Б', gradingStatus: 'graded' });
+  });
+
+  it('прочая ошибка get_participant не глушится', async () => {
+    stubMoodle({
+      mod_assign_get_submission_status: () => ({ lastattempt: { gradingstatus: 'graded' } }),
+      mod_assign_get_participant: () => ({
+        exception: 'moodle_exception',
+        errorcode: 'usernotincourse',
+        message: 'User is not enrolled',
+      }),
+    });
+
+    await expect(
+      assignmentsTools.moodle_get_submission.execute({ assignmentId: 5, userId: 102 }),
+    ).rejects.toThrow(/usernotincourse/);
+  });
+
   it('комментарии недоступны — null, сдача читается', async () => {
     stubMoodle({
       mod_assign_get_submission_status: () => ({
